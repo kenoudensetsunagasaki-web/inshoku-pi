@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>飲食.Pi — Pi・暗号資産で払えるお店を探す</title>
+<meta name="description" content="現在地の近くでPiや暗号資産で支払える飲食店を探し、Googleマップで経路を確認できます。" />
+<link rel="stylesheet" href="/assets/style.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/currencies.js"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar">
+    <div class="wordmark">飲食<span class="pi">.Pi</span></div>
+    <div class="topbar-actions">
+      <button class="pill-btn" id="langToggle" type="button">EN</button>
+      <button class="pill-btn" id="piSignIn" type="button" data-i18n="piSignIn">Piでサインイン</button>
+    </div>
+  </header>
+
+  <section class="control-strip">
+    <div class="locate-row">
+      <button class="locate-btn" id="locateBtn" type="button">
+        <span id="locateBtnLabel" data-i18n="locateBtn">現在地から探す</span>
+      </button>
+      <select class="radius-select" id="radiusSelect" aria-label="search radius">
+        <option value="1">1 km</option>
+        <option value="3" selected>3 km</option>
+        <option value="5">5 km</option>
+        <option value="10">10 km</option>
+        <option value="30">30 km</option>
+      </select>
+    </div>
+
+    <div class="chip-row" id="currencyChips"></div>
+
+    <div class="chip-row" id="travelModeChips">
+      <button class="chip active" data-mode="WALKING" data-i18n="travelWalk">徒歩</button>
+      <button class="chip" data-mode="DRIVING" data-i18n="travelDrive">車</button>
+      <button class="chip" data-mode="TRANSIT" data-i18n="travelTransit">公共交通機関</button>
+    </div>
+
+    <div class="chip-row">
+      <button class="chip" id="verifiedOnlyChip" type="button" data-i18n="verifiedOnly">確認済のみ</button>
+    </div>
+  </section>
+
+  <div id="map"></div>
+
+  <div class="list-header">
+    <span id="resultsCount">—</span>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <nav class="bottom-nav">
+    <a href="/index.html" class="active" data-i18n="navSearch">探す</a>
+    <a href="/submit.html" data-i18n="navSubmit">情報提供</a>
+    <a href="/register.html" data-i18n="navRegister">店舗登録</a>
+  </nav>
+  <div class="attribution">Includes venue data © OpenStreetMap contributors, via Coinmap (ODbL)</div>
+</div>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

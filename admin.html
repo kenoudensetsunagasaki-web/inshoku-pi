@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>管理 — 飲食.Pi</title>
+<link rel="stylesheet" href="/assets/style.css" />
+<script src="/assets/currencies.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="wordmark">飲食<span class="pi">.Pi</span> <span style="font-size:12px;color:var(--text-muted);margin-left:6px;">admin</span></div>
+  </header>
+
+  <div class="form-page">
+    <div id="loginBox">
+      <h1>管理者ログイン</h1>
+      <div class="field">
+        <label>パスワード</label>
+        <input type="text" id="pw" />
+      </div>
+      <button class="submit-btn" id="loginBtn">ログイン</button>
+    </div>
+
+    <div id="panel" style="display:none;">
+      <h1>審査待ち (コミュニティ投稿・外部取込)</h1>
+      <div id="pendingList" class="results" style="padding:0;"></div>
+
+      <h1 style="margin-top:32px;">外部ディレクトリから自動取込</h1>
+      <p class="subtitle" style="margin-bottom:12px;">
+        Coinmap(OpenStreetMapのタグ付けデータ、実質ほぼBitcoin)から、指定エリア内の飲食系ベニューを取り込みます。
+        Pi Network自体のディレクトリ(Map of Pi等)は現時点で外部から使える公開APIがないため未対応です — 詳細は README を参照。
+      </p>
+      <form id="importForm">
+        <div class="checkbox-grid" style="grid-template-columns:1fr 1fr;">
+          <div class="field" style="margin-bottom:0;"><label>緯度</label><input type="text" id="importLat" required /></div>
+          <div class="field" style="margin-bottom:0;"><label>経度</label><input type="text" id="importLng" required /></div>
+        </div>
+        <div class="field"><label>検索範囲(km)</label><input type="text" id="importRadius" value="15" /></div>
+        <div class="field">
+          <label><input type="checkbox" id="importAutoApprove" /> 取込と同時に「運営確認済み」相当で即公開する(通常はレビュー待ちに入れることを推奨)</label>
+        </div>
+        <button type="submit" class="submit-btn mint">Coinmapから取込を実行</button>
+      </form>
+      <div class="status-msg" id="importStatusMsg"></div>
+
+      <h1 style="margin-top:32px;">手動で店舗を追加</h1>
+      <form id="addForm">
+        <div class="field"><label>店舗名</label><input type="text" id="name" required /></div>
+        <div class="field"><label>住所</label><input type="text" id="address" required /></div>
+        <div class="field"><label>緯度</label><input type="text" id="lat" required /></div>
+        <div class="field"><label>経度</label><input type="text" id="lng" required /></div>
+        <div class="field"><label>料理ジャンル</label><input type="text" id="cuisine" /></div>
+        <div class="field">
+          <label>受け付ける決済</label>
+          <div class="checkbox-grid" id="currencyGrid"></div>
+        </div>
+        <button type="submit" class="submit-btn">運営確認済みとして追加</button>
+      </form>
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+  </div>
+</div>
+<script src="/assets/admin.js"></script>
+</body>
+</html>

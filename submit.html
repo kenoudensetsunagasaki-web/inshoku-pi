@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>情報提供 — 飲食.Pi</title>
+<link rel="stylesheet" href="/assets/style.css" />
+<script src="/assets/i18n.js"></script>
+<script src="/assets/currencies.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="wordmark">飲食<span class="pi">.Pi</span></div>
+    <button class="pill-btn" id="langToggle" type="button">EN</button>
+  </header>
+
+  <div class="form-page">
+    <h1 data-i18n="subTitle">情報を提供する</h1>
+    <p class="subtitle" data-i18n="subSubtitle"></p>
+
+    <form id="subForm">
+      <div class="field">
+        <label data-i18n="storeName">店舗名</label>
+        <input type="text" id="name" required />
+      </div>
+      <div class="field">
+        <label data-i18n="address">住所</label>
+        <input type="text" id="address" required />
+      </div>
+
+      <div class="field">
+        <label data-i18n="observedCurrencies">確認した決済方法</label>
+        <div class="checkbox-grid" id="currencyGrid"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="address">緯度・経度(任意)</label>
+        <button type="button" class="action-btn" id="useLocationBtn" data-i18n="useMyLocation">現在地の座標を使う</button>
+        <input type="hidden" id="lat" />
+        <input type="hidden" id="lng" />
+        <div class="stall-meta" id="coordsPreview" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="note">メモ(任意)</label>
+        <textarea id="note"></textarea>
+      </div>
+      <div class="field">
+        <label data-i18n="contact">連絡先(任意)</label>
+        <input type="text" id="contact" />
+      </div>
+
+      <button type="submit" class="submit-btn mint" data-i18n="submitBtn">情報を送信する</button>
+      <div class="status-msg" id="statusMsg"></div>
+    </form>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="/index.html" data-i18n="navSearch">探す</a>
+    <a href="/submit.html" class="active" data-i18n="navSubmit">情報提供</a>
+    <a href="/register.html" data-i18n="navRegister">店舗登録</a>
+  </nav>
+</div>
+
+<script src="/assets/submit.js"></script>
+</body>
+</html>

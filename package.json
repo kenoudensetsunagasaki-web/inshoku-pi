@@ -1,0 +1,17 @@
+{
+  "name": "inshoku-pi",
+  "version": "0.1.0",
+  "description": "飲食.Pi — find and get directions to places that accept Pi or crypto",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5"
+  }
+}

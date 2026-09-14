@@ -1,0 +1,133 @@
+// 飲食.Pi — minimal i18n helper. Two locales to start (ja/en); add more by
+// extending DICT with the same keys. Falls back to ja if a key is missing.
+const DICT = {
+  ja: {
+    appName: "飲食.Pi",
+    tagline: "Piや暗号資産で払えるお店を探す",
+    locateBtn: "現在地から探す",
+    locating: "位置情報を取得中…",
+    radius: "検索範囲",
+    all: "すべて",
+    verifiedOnly: "確認済のみ",
+    resultsFound: "件見つかりました",
+    noResults: "近くに登録店舗がありません",
+    noResultsSub: "掲載店舗を増やすには「情報提供」または「店舗登録」からご協力ください",
+    tierAdmin: "運営確認済み",
+    tierSelf: "自己申告(決済済)",
+    tierCommunity: "コミュニティ投稿",
+    tierExternal: "外部データ取込",
+    directions: "経路を見る",
+    details: "詳細",
+    travelWalk: "徒歩",
+    travelDrive: "車",
+    travelTransit: "公共交通機関",
+    navSearch: "探す",
+    navSubmit: "情報提供",
+    navRegister: "店舗登録",
+    piSignIn: "Piでサインイン",
+    piSignedIn: "サインイン済み",
+    away: "先",
+    // register page
+    regTitle: "店舗を登録する",
+    regSubtitle: "Piの支払いで掲載を申請します。支払い後、「自己申告(決済済)」バッジで即時掲載されます。運営が内容を確認できなかった場合は表示を取り下げることがあります。",
+    storeName: "店舗名",
+    storeNameEn: "店舗名(英語表記・任意)",
+    address: "住所",
+    cuisine: "料理ジャンル",
+    phone: "電話番号(任意)",
+    website: "ウェブサイト(任意)",
+    currencies: "受け付ける決済",
+    useMyLocation: "現在地の座標を使う",
+    coordsCaptured: "座標を取得しました",
+    listingFee: "掲載料",
+    payAndList: "支払って掲載する",
+    processingPayment: "決済処理中…",
+    regSuccess: "掲載が完了しました。検索画面でご確認いただけます。",
+    regError: "登録に失敗しました。時間をおいて再度お試しください。",
+    piRequired: "Pi Browserでサインインしてから登録してください。",
+    // submit page
+    subTitle: "情報を提供する",
+    subSubtitle: "支払いは不要です。暗号資産で支払えるお店を見つけたら教えてください。運営またはコミュニティの確認後に掲載されます。",
+    observedCurrencies: "確認した決済方法",
+    note: "メモ(任意・どうやって知ったか等)",
+    contact: "連絡先(任意・確認のご連絡用)",
+    submitBtn: "情報を送信する",
+    subSuccess: "ありがとうございます。確認後に掲載されます。",
+    subError: "送信に失敗しました。時間をおいて再度お試しください。",
+    required: "必須項目です",
+    selectAtLeastOne: "決済方法を1つ以上選んでください",
+  },
+  en: {
+    appName: "Inshoku.Pi",
+    tagline: "Find places that take Pi or crypto",
+    locateBtn: "Search near me",
+    locating: "Getting your location…",
+    radius: "Search radius",
+    all: "All",
+    verifiedOnly: "Verified only",
+    resultsFound: "places found",
+    noResults: "No listed places nearby yet",
+    noResultsSub: "Help grow the map — submit a tip or register a business",
+    tierAdmin: "Admin verified",
+    tierSelf: "Self-listed (paid)",
+    tierCommunity: "Community tip",
+    tierExternal: "Imported (external)",
+    directions: "Directions",
+    details: "Details",
+    travelWalk: "Walk",
+    travelDrive: "Drive",
+    travelTransit: "Transit",
+    navSearch: "Search",
+    navSubmit: "Submit a tip",
+    navRegister: "Register business",
+    piSignIn: "Sign in with Pi",
+    piSignedIn: "Signed in",
+    away: "away",
+    regTitle: "Register your business",
+    regSubtitle: "Pay with Pi to list your business. Once paid, you appear immediately with a \"Self-listed (paid)\" badge. Listings may be removed if we can't verify them.",
+    storeName: "Business name",
+    storeNameEn: "Business name (English, optional)",
+    address: "Address",
+    cuisine: "Cuisine type",
+    phone: "Phone (optional)",
+    website: "Website (optional)",
+    currencies: "Accepted payments",
+    useMyLocation: "Use my current coordinates",
+    coordsCaptured: "Location captured",
+    listingFee: "Listing fee",
+    payAndList: "Pay & list",
+    processingPayment: "Processing payment…",
+    regSuccess: "You're listed! Check the search page.",
+    regError: "Registration failed. Please try again later.",
+    piRequired: "Please sign in with Pi Browser before registering.",
+    subTitle: "Submit a tip",
+    subSubtitle: "No payment needed. Tell us about a place that accepts crypto — it goes live after admin or community review.",
+    observedCurrencies: "Payment methods observed",
+    note: "Notes (optional)",
+    contact: "Contact (optional, for follow-up)",
+    submitBtn: "Send tip",
+    subSuccess: "Thanks! It will appear once reviewed.",
+    subError: "Failed to send. Please try again later.",
+    required: "Required",
+    selectAtLeastOne: "Select at least one payment method",
+  },
+};
+
+function getLocale() {
+  return localStorage.getItem("ip_locale") || "ja";
+}
+function setLocale(loc) {
+  localStorage.setItem("ip_locale", loc);
+}
+function t(key) {
+  const loc = getLocale();
+  return (DICT[loc] && DICT[loc][key]) || DICT.ja[key] || key;
+}
+function applyI18n(root = document) {
+  root.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.setAttribute("placeholder", t(el.getAttribute("data-i18n-placeholder")));
+  });
+}
