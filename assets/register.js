@@ -11,7 +11,7 @@
     langToggle.textContent = getLocale() === "ja" ? "EN" : "日本語";
   });
 
-  const LISTING_FEE_PI = 3;
+  const LISTING_FEE_PI = 1; // per month — see onReadyForServerCompletion below
   let piUser = null;
   let coords = null;
 
@@ -108,8 +108,8 @@
       await Pi.createPayment(
         {
           amount: LISTING_FEE_PI,
-          memo: `飲食.Pi listing: ${restaurant.name}`,
-          metadata: { type: "restaurant_listing", restaurant },
+          memo: `飲食.Pi listing (1st month): ${restaurant.name}`,
+          metadata: { type: "new_listing", restaurant },
         },
         {
           onReadyForServerApproval: (paymentId) => {
@@ -123,7 +123,7 @@
             fetch("/api/payments/complete", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ paymentId, txid, restaurant }),
+              body: JSON.stringify({ paymentId, txid, paymentType: "new_listing", restaurant }),
             })
               .then((r) => r.json())
               .then(() => {

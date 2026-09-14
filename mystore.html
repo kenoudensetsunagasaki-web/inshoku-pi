@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>マイ店舗 — 飲食.Pi</title>
+<link rel="stylesheet" href="/assets/style.css" />
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/currencies.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="wordmark">飲食<span class="pi">.Pi</span></div>
+    <button class="pill-btn" id="langToggle" type="button">EN</button>
+  </header>
+
+  <div class="form-page">
+    <h1 data-i18n="myStoreTitle">マイ店舗</h1>
+    <p class="subtitle" data-i18n="myStoreSubtitle"></p>
+
+    <div id="signedOutView">
+      <button class="submit-btn" id="piSignInBtn" data-i18n="piSignIn">Piでサインイン</button>
+    </div>
+
+    <div id="listings" style="display:flex;flex-direction:column;gap:12px;"></div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="/index.html" data-i18n="navSearch">探す</a>
+    <a href="/submit.html" data-i18n="navSubmit">情報提供</a>
+    <a href="/register.html" data-i18n="navRegister">店舗登録</a>
+    <a href="/mystore.html" class="active" data-i18n="navMyStore">マイ店舗</a>
+  </nav>
+</div>
+
+<script src="/assets/mystore.js"></script>
+</body>
+</html>

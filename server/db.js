@@ -65,12 +65,20 @@ function insert(restaurant) {
     status: restaurant.status || "pending", // pending | verified | rejected
     listing_paid: !!restaurant.listing_paid,
     listing_tx_id: restaurant.listing_tx_id || null,
+    // Self-registered listings are a recurring 1π/month subscription.
+    // Pi has no silent auto-billing, so this is enforced by hiding the
+    // listing from search once listing_expires_at passes, until the
+    // owner comes back and pays to renew (see routes/payments.js).
+    listing_expires_at: restaurant.listing_expires_at || null,
+    sponsored: !!restaurant.sponsored,
+    sponsored_until: restaurant.sponsored_until || null,
     submitted_by: restaurant.submitted_by || null,
     note: restaurant.note || "",
     contact: restaurant.contact || "",
     external_source: restaurant.external_source || null, // e.g. "coinmap"
     external_id: restaurant.external_id || null,
     votes: restaurant.votes || { up: 0, down: 0 },
+    stats: restaurant.stats || { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -92,8 +100,17 @@ function search({ lat, lng, radiusKm, currencies, verifiedOnly }) {
   // Both admin-verified and paid self-registered listings carry
   // status "verified" — the frontend tells them apart via `source`
   // and shows a different trust badge for each.
-  const list = load().filter((r) => r.status === "verified");
-  return list
+  const now = Date.now();
+  const list = load().filter((r) => {
+    if (r.status !== "verified") return false;
+    // Self-registered listings are a monthly subscription — once the
+    // paid period lapses, they drop out of search until renewed.
+    if (r.source === "self_registered" && r.listing_expires_at) {
+      if (new Date(r.listing_expires_at).getTime() < now) return false;
+    }
+    return true;
+  });
+  const results = list
     .map((r) => ({ ...r, distance_km: haversineKm(lat, lng, r.lat, r.lng) }))
     .filter((r) => r.distance_km <= radiusKm)
     .filter((r) => {
@@ -104,11 +121,88 @@ function search({ lat, lng, radiusKm, currencies, verifiedOnly }) {
       if (!verifiedOnly) return true;
       return r.source === "admin";
     })
-    .sort((a, b) => a.distance_km - b.distance_km);
+    .sort((a, b) => {
+      const aSponsored = a.sponsored && a.sponsored_until && new Date(a.sponsored_until).getTime() > now;
+      const bSponsored = b.sponsored && b.sponsored_until && new Date(b.sponsored_until).getTime() > now;
+      if (aSponsored !== bSponsored) return aSponsored ? -1 : 1; // sponsored listings float to the top
+      return a.distance_km - b.distance_km;
+    });
+
+  // Count this as an "impression" for each listing that made it into the
+  // results — cheap analytics for the store-owner dashboard. Batched into
+  // a single read-modify-write instead of one per listing.
+  try {
+    if (results.length > 0) {
+      const resultIds = new Set(results.map((r) => r.id));
+      const fullList = load();
+      fullList.forEach((r) => {
+        if (resultIds.has(r.id)) {
+          if (!r.stats) r.stats = { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 };
+          r.stats.impressions = (r.stats.impressions || 0) + 1;
+        }
+      });
+      save(fullList);
+    }
+  } catch (err) {
+    console.error("impression tracking failed:", err.message);
+  }
+
+  return results;
+}
+
+function findBySubmitter(username) {
+  return load().filter((r) => r.submitted_by === username);
+}
+
+function incrementStat(id, field) {
+  const list = load();
+  const idx = list.findIndex((r) => r.id === id);
+  if (idx === -1) return;
+  if (!list[idx].stats) list[idx].stats = { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 };
+  list[idx].stats[field] = (list[idx].stats[field] || 0) + 1;
+  save(list);
+}
+
+function extendExpiry(id, days) {
+  const list = load();
+  const idx = list.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  const current = list[idx].listing_expires_at ? new Date(list[idx].listing_expires_at).getTime() : Date.now();
+  const base = Math.max(current, Date.now()); // renewing early doesn't lose remaining days
+  list[idx].listing_expires_at = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
+  list[idx].updated_at = new Date().toISOString();
+  save(list);
+  return list[idx];
+}
+
+function extendSponsor(id, days) {
+  const list = load();
+  const idx = list.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  const current = list[idx].sponsored_until ? new Date(list[idx].sponsored_until).getTime() : Date.now();
+  const base = Math.max(current, Date.now());
+  list[idx].sponsored = true;
+  list[idx].sponsored_until = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
+  list[idx].updated_at = new Date().toISOString();
+  save(list);
+  return list[idx];
 }
 
 function pending() {
   return load().filter((r) => r.status === "pending");
 }
 
-module.exports = { all, getById, findByExternal, insert, update, search, pending, haversineKm };
+module.exports = {
+  all,
+  getById,
+  findByExternal,
+  findBySubmitter,
+  insert,
+  update,
+  search,
+  pending,
+  haversineKm,
+  incrementStat,
+  extendExpiry,
+  extendSponsor,
+};

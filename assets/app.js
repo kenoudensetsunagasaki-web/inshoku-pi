@@ -234,6 +234,9 @@
     card.className = "stall-card";
     card.dataset.tier = tier.css;
 
+    const now = Date.now();
+    const isSponsored = r.sponsored && r.sponsored_until && new Date(r.sponsored_until).getTime() > now;
+
     const currencyBadges = (r.accepted_currencies || [])
       .map((c) => `<span class="badge currency">${currencyLabel(c)}</span>`)
       .join("");
@@ -241,7 +244,7 @@
     card.innerHTML = `
       <div class="stall-top">
         <div>
-          <div class="stall-name">${escapeHtml(r.name)}</div>
+          <div class="stall-name">${isSponsored ? '<span style="color:var(--accent-lantern);font-size:11px;font-weight:700;margin-right:4px;">PR</span>' : ""}${escapeHtml(r.name)}</div>
           <div class="stall-meta">${escapeHtml(r.cuisine || "")}${r.cuisine ? " · " : ""}${escapeHtml(r.address || "")}</div>
         </div>
         <div class="stall-dist">${r.distance_km != null ? r.distance_km.toFixed(1) + " km " + t("away") : ""}</div>
@@ -260,8 +263,10 @@
     const openLink = card.querySelector('[data-action="open"]');
     const gmapsUrl = buildGmapsUrl(r);
     openLink.href = gmapsUrl;
+    openLink.addEventListener("click", () => trackEvent(r.id, "gmaps"));
 
     dirBtn.addEventListener("click", () => {
+      trackEvent(r.id, "directions");
       if (!state.userLoc || !state.map) {
         window.open(gmapsUrl, "_blank");
         return;
@@ -303,6 +308,15 @@
     return String(str).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[c]));
+  }
+
+  // Fire-and-forget click tracking for the store-owner dashboard (マイ店舗).
+  function trackEvent(restaurantId, event) {
+    fetch(`/api/restaurants/${restaurantId}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+    }).catch(() => {});
   }
 
   // ---------- Pi auth ----------

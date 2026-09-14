@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+const PI_API_BASE = "https://api.minepi.com/v2";
+
 // GET /api/restaurants/search?lat=&lng=&radius=&currencies=PI,BTC&verifiedOnly=true
 router.get("/search", (req, res) => {
   const lat = parseFloat(req.query.lat);
@@ -17,10 +19,46 @@ router.get("/search", (req, res) => {
   res.json({ results });
 });
 
+// GET /api/restaurants/mine — the store owner's own listings, for the
+// "マイ店舗" dashboard. Requires the Pi accessToken the client got from
+// Pi.authenticate(); we verify it against Pi's own /v2/me endpoint rather
+// than trusting a client-supplied username, so people can't peek at
+// someone else's stats by guessing a username.
+// NOTE: this must be registered before the "/:id" route below, or Express
+// will match "mine" as an :id.
+router.get("/mine", async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "missing Pi access token" });
+  try {
+    const meRes = await fetch(`${PI_API_BASE}/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!meRes.ok) return res.status(401).json({ error: "invalid Pi session" });
+    const me = await meRes.json();
+    const mine = db.findBySubmitter(me.username);
+    res.json({ results: mine });
+  } catch (err) {
+    console.error("mine lookup error:", err.message);
+    res.status(502).json({ error: "failed to verify Pi session" });
+  }
+});
+
 router.get("/:id", (req, res) => {
   const r = db.getById(req.params.id);
   if (!r) return res.status(404).json({ error: "not found" });
   res.json(r);
+});
+
+// POST /api/restaurants/:id/track  { event: "directions" | "gmaps" }
+// Fire-and-forget click tracking for the store-owner dashboard. No auth —
+// it's just an anonymous counter, same trust level as a page-view count.
+router.post("/:id/track", (req, res) => {
+  const { event } = req.body || {};
+  const field = { directions: "directions_clicks", gmaps: "gmaps_clicks" }[event];
+  if (!field) return res.status(400).json({ error: "unknown event" });
+  db.incrementStat(req.params.id, field);
+  res.json({ ok: true });
 });
 
 // POST /api/restaurants/submit — free crowdsourced tip, goes to pending queue

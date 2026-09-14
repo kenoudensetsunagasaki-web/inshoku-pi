@@ -21,8 +21,10 @@
     <p class="subtitle" data-i18n="regSubtitle"></p>
 
     <div class="notice-box">
-      <strong data-i18n="listingFee">掲載料</strong>: 3 π —
+      <strong data-i18n="listingFee">掲載料</strong>: <span id="feeLabel">1 π / 月</span> —
       <span id="piAuthStatus" data-i18n="piRequired">Pi Browserでサインインしてから登録してください。</span>
+      <br />
+      <span style="font-size:12px;">毎月自動で引き落とされるわけではありません。期限が近づいたら「<a href="/mystore.html" style="color:var(--accent-mint);">マイ店舗</a>」ページから更新してください(更新を忘れると掲載は非表示になります)。</span>
     </div>
 
     <form id="regForm">
@@ -73,6 +75,7 @@
     <a href="/index.html" data-i18n="navSearch">探す</a>
     <a href="/submit.html" data-i18n="navSubmit">情報提供</a>
     <a href="/register.html" class="active" data-i18n="navRegister">店舗登録</a>
+    <a href="/mystore.html" data-i18n="navMyStore">マイ店舗</a>
   </nav>
 </div>
 
