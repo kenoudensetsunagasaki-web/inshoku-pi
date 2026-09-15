@@ -5,13 +5,14 @@ const db = require("../db");
 const PI_API_BASE = "https://api.minepi.com/v2";
 
 // GET /api/restaurants/search?lat=&lng=&radius=&currencies=PI,BTC&verifiedOnly=true
+// radius accepts a number (km) or the literal "unlimited" for no distance cap.
 router.get("/search", (req, res) => {
   const lat = parseFloat(req.query.lat);
   const lng = parseFloat(req.query.lng);
-  const radiusKm = parseFloat(req.query.radius) || 3;
   if (Number.isNaN(lat) || Number.isNaN(lng)) {
     return res.status(400).json({ error: "lat and lng are required" });
   }
+  const radiusKm = req.query.radius === "unlimited" ? Infinity : parseFloat(req.query.radius) || 3;
   const currencies = req.query.currencies ? req.query.currencies.split(",") : [];
   const verifiedOnly = req.query.verifiedOnly === "true";
 

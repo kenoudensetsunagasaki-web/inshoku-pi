@@ -4,7 +4,7 @@
 
   const state = {
     userLoc: null, // {lat, lng}
-    radiusKm: 3,
+    radiusKm: "3", // "1".."100" or "unlimited"
     activeCurrencies: new Set(), // empty = all
     verifiedOnly: false,
     travelMode: "WALKING", // WALKING | DRIVING | TRANSIT
@@ -87,7 +87,7 @@
   });
 
   document.getElementById("radiusSelect").addEventListener("change", (e) => {
-    state.radiusKm = Number(e.target.value);
+    state.radiusKm = e.target.value; // "1".."100" or "unlimited"
     if (state.userLoc) fetchResults();
   });
 
@@ -151,7 +151,7 @@
     const params = new URLSearchParams({
       lat: state.userLoc.lat,
       lng: state.userLoc.lng,
-      radius: state.radiusKm,
+      radius: state.radiusKm, // backend treats "unlimited" as no distance cap
     });
     if (state.activeCurrencies.size > 0) {
       params.set("currencies", [...state.activeCurrencies].join(","));
