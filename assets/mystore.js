@@ -75,10 +75,14 @@
     card.className = "stall-card";
     card.dataset.tier = r.source === "self_registered" ? "self" : "admin";
 
-    const expDays = daysLeft(r.listing_expires_at);
+       const expDays = daysLeft(r.listing_expires_at);
     const expired = expDays != null && expDays < 0;
     const sponsorDays = daysLeft(r.sponsored_until);
     const isSponsored = r.sponsored && sponsorDays != null && sponsorDays > 0;
+    // Testnet-campaign free listings have no expires_at and were never paid
+    // for — no renewal is ever needed, so don't show the renew button or it
+    // reads as "you owe money" to an owner who registered for free.
+    const isFreeCampaignListing = r.source === "self_registered" && !r.listing_paid && r.listing_expires_at == null;
 
     const stats = r.stats || { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 };
 
@@ -88,6 +92,7 @@
       </div>
       <div class="stall-meta">${escapeHtml(r.address || "")}</div>
       <div class="badge-row">
+        ${isFreeCampaignListing ? `<span class="badge currency">${t("myStoreFreeCampaign")}</span>` : ""}
         ${expired ? `<span class="badge" style="color:var(--accent-danger);border-color:var(--accent-danger);">${t("myStoreExpired")}</span>` : ""}
         ${!expired && expDays != null ? `<span class="badge currency">${t("myStoreDaysLeft").replace("{n}", expDays)}</span>` : ""}
         ${isSponsored ? `<span class="badge trust-self">PR · ${t("myStoreDaysLeft").replace("{n}", sponsorDays)}</span>` : ""}
@@ -100,7 +105,7 @@
         ${t("myStoreGmapsClicks")}: <strong style="color:var(--text-primary);">${stats.gmaps_clicks}</strong>
       </div>
       <div class="stall-actions">
-        <button class="action-btn primary" data-action="renew">${t("myStoreRenew").replace("{fee}", RENEWAL_FEE_PI)}</button>
+        ${isFreeCampaignListing ? "" : `<button class="action-btn primary" data-action="renew">${t("myStoreRenew").replace("{fee}", RENEWAL_FEE_PI)}</button>`}
         <button class="action-btn" data-action="sponsor">${isSponsored ? t("myStoreExtendSponsor") : t("myStoreBecomeSponsor")}${" (" + SPONSOR_FEE_PI + "π)"}</button>
       </div>
       <button class="detail-toggle" data-action="toggleEdit">${t("myStoreEditInfo")}</button>
@@ -163,9 +168,12 @@
       msgEl.className = "status-msg show " + (ok ? "ok" : "err");
     }
 
-    card.querySelector('[data-action="renew"]').addEventListener("click", () => {
-      payFor(r.id, "renewal", RENEWAL_FEE_PI, `飲食.Pi renewal: ${r.name}`, showMsg);
-    });
+       const renewBtn = card.querySelector('[data-action="renew"]');
+    if (renewBtn) {
+      renewBtn.addEventListener("click", () => {
+        payFor(r.id, "renewal", RENEWAL_FEE_PI, `飲食.Pi renewal: ${r.name}`, showMsg);
+      });
+    }
     card.querySelector('[data-action="sponsor"]').addEventListener("click", () => {
       payFor(r.id, "sponsor", SPONSOR_FEE_PI, `飲食.Pi sponsor: ${r.name}`, showMsg);
     });
