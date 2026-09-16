@@ -52,6 +52,8 @@
         <div class="field"><label>緯度</label><input type="text" id="lat" required /></div>
         <div class="field"><label>経度</label><input type="text" id="lng" required /></div>
         <div class="field"><label>料理ジャンル</label><input type="text" id="cuisine" /></div>
+        <div class="field"><label>営業時間</label><input type="text" id="hours" /></div>
+        <div class="field"><label>おすすめメニュー(1行1品)</label><textarea id="menuHighlights"></textarea></div>
         <div class="field">
           <label>受け付ける決済</label>
           <div class="checkbox-grid" id="currencyGrid"></div>
@@ -59,6 +61,10 @@
         <button type="submit" class="submit-btn">運営確認済みとして追加</button>
       </form>
       <div class="status-msg" id="statusMsg"></div>
+
+      <h1 style="margin-top:32px;">口コミ管理(通報・スパム対応)</h1>
+      <p class="subtitle" style="margin-bottom:12px;">不適切な口コミを非表示にできます(削除ではなく非表示。評価の平均値には反映されなくなります)。</p>
+      <div id="reviewsList" class="results" style="padding:0;"></div>
     </div>
   </div>
 </div>

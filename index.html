@@ -49,8 +49,11 @@
 
     <div class="chip-row">
       <button class="chip" id="verifiedOnlyChip" type="button" data-i18n="verifiedOnly">確認済のみ</button>
+      <button class="chip" id="lowDataChip" type="button" data-i18n="lowDataMode">低速回線モード</button>
     </div>
   </section>
+
+  <div class="offline-banner" id="offlineBanner" data-i18n="offlineBanner"></div>
 
   <div id="map"></div>
 
@@ -70,5 +73,6 @@
 </div>
 
 <script src="/assets/app.js"></script>
+<script src="/assets/sw-register.js"></script>
 </body>
 </html>

@@ -30,6 +30,15 @@
       </div>
 
       <div class="field">
+        <label data-i18n="hours">営業時間</label>
+        <input type="text" id="hours" data-i18n-placeholder="hoursPlaceholder" />
+      </div>
+      <div class="field">
+        <label data-i18n="menuHighlights">おすすめメニュー(任意)</label>
+        <textarea id="menuHighlights" data-i18n-placeholder="menuHighlightsPlaceholder"></textarea>
+      </div>
+
+      <div class="field">
         <label data-i18n="observedCurrencies">確認した決済方法</label>
         <div class="checkbox-grid" id="currencyGrid"></div>
       </div>
@@ -65,5 +74,6 @@
 </div>
 
 <script src="/assets/submit.js"></script>
+<script src="/assets/sw-register.js"></script>
 </body>
 </html>

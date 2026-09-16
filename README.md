@@ -100,34 +100,43 @@ Map of Pi や Piketplace のような、Pi専用の店舗ディレクトリ自�
 
 ```
 inshoku-pi/
-├── index.html          検索画面(現在地・地図・一覧・経路案内)
-├── register.html        店舗自己登録(Pi払い、月額1π)
-├── submit.html           情報提供(無料・コミュニティ投稿)
-├── admin.html            管理画面(審査・手動登録)
-├── mystore.html          マイ店舗(更新・スポンサー・アクセス解析)
+├── index.html          検索画面(現在地・地図・一覧・経路案内・口コミ・低速回線モード)
+├── register.html        店舗自己登録(Pi払い、月額1π、営業時間・メニュー入力可)
+├── submit.html           情報提供(無料・コミュニティ投稿、営業時間・メニューも任意で提供可)
+├── admin.html            管理画面(審査・手動登録・口コミモデレーション)
+├── mystore.html          マイ店舗(更新・スポンサー・アクセス解析・営業時間/メニュー編集)
+├── sw.js                 オフライン/低速回線対応のService Worker(アプリシェルのキャッシュ)
 ├── assets/
 │   ├── style.css         共通デザイントークン
 │   ├── i18n.js           日本語/英語の切り替え辞書
 │   ├── currencies.js     対応通貨リスト(Pi/BTC/ETH/USDT/USDC/その他)
-│   ├── app.js            検索画面ロジック
+│   ├── app.js            検索画面ロジック(口コミ・詳細パネル・オフラインフォールバック含む)
 │   ├── register.js       登録画面ロジック(Pi決済)
 │   ├── submit.js         投稿画面ロジック
-│   ├── mystore.js        マイ店舗ロジック(更新・スポンサー決済、Pi /v2/me 認証)
-│   └── admin.js          管理画面ロジック
+│   ├── mystore.js        マイ店舗ロジック(更新・スポンサー決済、Pi /v2/me 認証、店舗情報編集)
+│   ├── admin.js          管理画面ロジック
+│   └── sw-register.js    Service Worker登録スクリプト(全ページ共通)
 ├── server/
 │   ├── server.js         Expressエントリーポイント(自動取込スケジューラ含む)
-│   ├── db.js             JSONファイルベースの簡易データ層
+│   ├── db.js             JSONファイルベースの簡易データ層(口コミ・評価・店舗情報編集含む)
 │   ├── importers/
 │   │   ├── coinmap.js        Coinmap連携(実装済み)
 │   │   └── pi-directories.js  Pi Network系ディレクトリ用の空スタブ
 │   ├── routes/
-│   │   ├── restaurants.js  検索・投稿API
+│   │   ├── restaurants.js  検索・投稿・口コミ・店舗情報編集API
 │   │   ├── payments.js     Pi決済 approve/complete
-│   │   └── admin.js        管理API(トークン認証・自動取込トリガー含む)
+│   │   └── admin.js        管理API(トークン認証・自動取込・口コミモデレーション含む)
 │   └── data/restaurants.json  サンプルデータ(世界5都市)
 ├── package.json
 └── .env.example
 ```
+
+## 追加された機能(店舗情報・口コミ・オフライン対応)
+
+- **店舗情報の充実**: `hours`(営業時間)と`menu_highlights`(おすすめメニュー、1行1品)を店舗データに追加。登録・情報提供・管理画面のすべてから入力でき、検索画面のカードを開くと表示されます。店舗オーナーは`/mystore.html`からいつでも編集できます(`PATCH /api/restaurants/mine/:id`、Pi認証で本人確認)。
+- **口コミ・評価機能**: 誰でも★1〜5の評価とコメントを投稿できます(`POST /api/restaurants/:id/reviews`)。平均評価と件数は自動集計され、検索カードに表示されます。不適切な投稿は`/admin.html`から非表示にでき(削除ではなく非表示、平均値からは除外)、削除は行わず監査性を保っています。
+- **多言語対応**: 既存のja/en切り替えの辞書に、上記すべての新UI文言を追加しました。
+- **オフライン/低速回線対応**: `sw.js`(Service Worker)がアプリの基本画面(HTML/CSS/JS)をキャッシュし、電波が弱い・圏外でもアプリ自体は開けます。検索結果もlocalStorageにキャッシュし、通信できない場合は最後に取得した結果を「オフラインです」の表示付きで見せます。さらに「低速回線モード」トグルで地図(OpenStreetMapタイル)の読み込み自体を止め、データ通信量を大きく抑えられます。
 
 ## セットアップ
 
