@@ -103,8 +103,59 @@
         <button class="action-btn primary" data-action="renew">${t("myStoreRenew").replace("{fee}", RENEWAL_FEE_PI)}</button>
         <button class="action-btn" data-action="sponsor">${isSponsored ? t("myStoreExtendSponsor") : t("myStoreBecomeSponsor")}${" (" + SPONSOR_FEE_PI + "π)"}</button>
       </div>
+      <button class="detail-toggle" data-action="toggleEdit">${t("myStoreEditInfo")}</button>
+      <div class="stall-detail" data-role="editPanel">
+        <div class="field">
+          <label data-i18n="hours">${t("hours")}</label>
+          <input type="text" data-role="editHours" value="${escapeHtml(r.hours || "")}" placeholder="${t("hoursPlaceholder")}" />
+        </div>
+        <div class="field">
+          <label>${t("menuHighlights")}</label>
+          <textarea data-role="editMenu" placeholder="${t("menuHighlightsPlaceholder")}">${escapeHtml((r.menu_highlights || []).join("\n"))}</textarea>
+        </div>
+        <div class="stall-actions">
+          <button class="action-btn primary" data-action="saveEdit">${t("myStoreEditSave")}</button>
+        </div>
+        <div class="status-msg" data-role="editMsg"></div>
+      </div>
       <div class="status-msg" data-role="msg"></div>
     `;
+
+    const editPanel = card.querySelector('[data-role="editPanel"]');
+    card.querySelector('[data-action="toggleEdit"]').addEventListener("click", (e) => {
+      const open = editPanel.classList.toggle("open");
+      e.currentTarget.textContent = open ? t("myStoreEditCancel") : t("myStoreEditInfo");
+    });
+
+    const editMsgEl = card.querySelector('[data-role="editMsg"]');
+    card.querySelector('[data-action="saveEdit"]').addEventListener("click", () => {
+      const hours = card.querySelector('[data-role="editHours"]').value.trim();
+      const menu_highlights = card
+        .querySelector('[data-role="editMenu"]')
+        .value.split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      fetch(`/api/restaurants/mine/${r.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${state.accessToken}`,
+        },
+        body: JSON.stringify({ hours, menu_highlights }),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("failed");
+          return res.json();
+        })
+        .then(() => {
+          editMsgEl.textContent = t("myStoreEditSuccess");
+          editMsgEl.className = "status-msg show ok";
+        })
+        .catch(() => {
+          editMsgEl.textContent = t("myStorePayError");
+          editMsgEl.className = "status-msg show err";
+        });
+    });
 
     const msgEl = card.querySelector('[data-role="msg"]');
     function showMsg(text, ok) {

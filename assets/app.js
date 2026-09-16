@@ -13,6 +13,7 @@
     userMarker: null,
     routeLine: null,
     piUser: null,
+    lowDataMode: localStorage.getItem("ip_low_data") === "true",
   };
 
   // ---------- i18n / locale toggle ----------
@@ -74,6 +75,21 @@
     if (state.userLoc) fetchResults();
   });
 
+  // ---------- low-data mode (offline/low-bandwidth support) ----------
+  // The map (OpenStreetMap tiles) is by far the heaviest thing this page
+  // loads. Turning it off skips tile requests entirely and reloads so the
+  // map never gets created in the first place — everything else (search,
+  // directions link, reviews) keeps working exactly as before, since the
+  // rest of the app already null-checks state.map.
+  const lowDataChip = document.getElementById("lowDataChip");
+  lowDataChip.classList.toggle("active", state.lowDataMode);
+  document.getElementById("map").style.display = state.lowDataMode ? "none" : "";
+  lowDataChip.addEventListener("click", () => {
+    const next = !state.lowDataMode;
+    localStorage.setItem("ip_low_data", String(next));
+    location.reload();
+  });
+
   // ---------- travel mode ----------
   const travelChipRow = document.getElementById("travelModeChips");
   travelChipRow.addEventListener("click", (e) => {
@@ -102,7 +118,7 @@
       maxZoom: 19,
     }).addTo(state.map);
   }
-  initMap();
+  if (!state.lowDataMode) initMap();
 
   // ---------- locate ----------
   const locateBtn = document.getElementById("locateBtn");
@@ -146,6 +162,30 @@
 
   // ---------- fetch + render ----------
   let lastResults = [];
+  const CACHE_KEY = "ip_last_results";
+  const offlineBanner = document.getElementById("offlineBanner");
+
+  function showOfflineBanner(show) {
+    offlineBanner.classList.toggle("show", show);
+    offlineBanner.textContent = t("offlineBanner");
+  }
+
+  function cacheResults(results) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ results, cachedAt: Date.now() }));
+    } catch {
+      /* localStorage full/unavailable — offline cache just won't work, no big deal */
+    }
+  }
+
+  function loadCachedResults() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      return raw ? JSON.parse(raw).results : null;
+    } catch {
+      return null;
+    }
+  }
 
   function fetchResults() {
     const params = new URLSearchParams({
@@ -161,16 +201,36 @@
     fetch(`/api/restaurants/search?${params.toString()}`)
       .then((r) => r.json())
       .then((data) => {
+        showOfflineBanner(false);
         lastResults = data.results || [];
+        cacheResults(lastResults);
         renderResults(lastResults);
         renderMarkers(lastResults);
       })
       .catch(() => {
-        document.getElementById("resultsCount").textContent = "—";
-        document.getElementById("results").innerHTML =
-          '<div class="empty-state"><div class="title">通信エラー</div>API サーバーに接続できませんでした。</div>';
+        // Offline, or the API server is unreachable — the service worker
+        // may already have served a cached response for this exact query;
+        // if not (e.g. first load with no connection at all), fall back to
+        // whatever we last successfully fetched, from localStorage.
+        const cached = loadCachedResults();
+        if (cached && cached.length > 0) {
+          showOfflineBanner(true);
+          lastResults = cached;
+          renderResults(lastResults);
+          renderMarkers(lastResults);
+        } else {
+          document.getElementById("resultsCount").textContent = "—";
+          document.getElementById("results").innerHTML =
+            '<div class="empty-state"><div class="title">通信エラー</div>API サーバーに接続できませんでした。</div>';
+        }
       });
   }
+
+  window.addEventListener("online", () => {
+    showOfflineBanner(false);
+    if (state.userLoc) fetchResults();
+  });
+  window.addEventListener("offline", () => showOfflineBanner(true));
 
   function clearMarkers() {
     state.markers.forEach((m) => state.map.removeLayer(m));
@@ -241,11 +301,16 @@
       .map((c) => `<span class="badge currency">${currencyLabel(c)}</span>`)
       .join("");
 
+    const ratingSummary = r.rating_count > 0
+      ? `<div class="rating-summary"><span class="stars">${starString(r.rating_avg)}</span> ${r.rating_avg.toFixed(1)} (${r.rating_count} ${t("reviewsCount")})</div>`
+      : "";
+
     card.innerHTML = `
       <div class="stall-top">
         <div>
           <div class="stall-name">${isSponsored ? '<span style="color:var(--accent-lantern);font-size:11px;font-weight:700;margin-right:4px;">PR</span>' : ""}${escapeHtml(r.name)}</div>
           <div class="stall-meta">${escapeHtml(r.cuisine || "")}${r.cuisine ? " · " : ""}${escapeHtml(r.address || "")}</div>
+          ${ratingSummary}
         </div>
         <div class="stall-dist">${r.distance_km != null ? r.distance_km.toFixed(1) + " km " + t("away") : ""}</div>
       </div>
@@ -257,7 +322,19 @@
         <button class="action-btn primary" data-action="directions">${t("directions")}</button>
         <a class="action-btn" data-action="open" target="_blank" rel="noopener">Google Maps ↗</a>
       </div>
+      <button class="detail-toggle" data-action="toggleDetail">${t("viewDetails")}</button>
+      <div class="stall-detail" data-role="detail"></div>
     `;
+
+    card.querySelector('[data-action="toggleDetail"]').addEventListener("click", (e) => {
+      const detailEl = card.querySelector('[data-role="detail"]');
+      const isOpen = detailEl.classList.toggle("open");
+      e.currentTarget.textContent = isOpen ? t("hideDetails") : t("viewDetails");
+      if (isOpen && !detailEl.dataset.loaded) {
+        detailEl.dataset.loaded = "true";
+        renderDetail(detailEl, r);
+      }
+    });
 
     const dirBtn = card.querySelector('[data-action="directions"]');
     const openLink = card.querySelector('[data-action="open"]');
@@ -288,6 +365,103 @@
     });
 
     return card;
+  }
+
+  function starString(avg) {
+    const full = Math.round(avg);
+    return "★".repeat(full) + "☆".repeat(5 - full);
+  }
+
+  // Detail panel is built lazily (only when the user expands a card) and
+  // fetches the full restaurant record — reviews aren't included in the
+  // lightweight /search response, keeping that endpoint fast and small
+  // for low-bandwidth users.
+  function renderDetail(detailEl, r) {
+    detailEl.innerHTML = `<div class="detail-row">${t("hours")}: …</div>`;
+    fetch(`/api/restaurants/${r.id}`)
+      .then((res) => res.json())
+      .then((full) => {
+        const hoursHtml = `<div class="detail-row"><strong>${t("hours")}</strong>${escapeHtml(full.hours) || `<span style="color:var(--text-faint);">${t("noHours")}</span>`}</div>`;
+        const menuItems = full.menu_highlights || [];
+        const menuHtml = `<div class="detail-row"><strong>${t("menuHighlightsShort")}</strong>${
+          menuItems.length
+            ? "<ul>" + menuItems.map((m) => `<li>${escapeHtml(m)}</li>`).join("") + "</ul>"
+            : `<span style="color:var(--text-faint);">${t("noMenu")}</span>`
+        }</div>`;
+
+        const reviews = (full.reviews || []).filter((rv) => rv.status !== "hidden").slice().reverse();
+        const reviewListHtml = reviews.length
+          ? `<div class="review-list">${reviews
+              .map(
+                (rv) => `<div class="review-item">
+                  <span class="stars">${starString(rv.rating)}</span>
+                  <span class="review-author">${escapeHtml(rv.author || t("anonymous"))}</span>
+                  ${rv.comment ? `<div class="review-comment">${escapeHtml(rv.comment)}</div>` : ""}
+                </div>`
+              )
+              .join("")}</div>`
+          : `<div class="detail-row" style="color:var(--text-faint);">${t("noReviews")}</div>`;
+
+        detailEl.innerHTML = `
+          ${hoursHtml}
+          ${menuHtml}
+          <div class="detail-row"><strong>${t("reviews")} (${full.rating_count || 0})</strong></div>
+          ${reviewListHtml}
+          <div class="review-form">
+            <div class="detail-row" style="margin-bottom:4px;"><strong>${t("writeReview")}</strong></div>
+            <div class="star-picker" data-role="starPicker">
+              ${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-star="${n}">★</button>`).join("")}
+            </div>
+            <input type="text" data-role="reviewName" placeholder="${t("yourName")}" />
+            <textarea data-role="reviewComment" placeholder="${t("yourComment")}"></textarea>
+            <button type="button" class="submit-btn mint" data-role="submitReview">${t("submitReview")}</button>
+            <div class="status-msg" data-role="reviewStatus"></div>
+          </div>
+        `;
+
+        let selectedStars = 0;
+        const starBtns = [...detailEl.querySelectorAll('[data-role="starPicker"] button')];
+        starBtns.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            selectedStars = Number(btn.dataset.star);
+            starBtns.forEach((b) => b.classList.toggle("on", Number(b.dataset.star) <= selectedStars));
+          });
+        });
+
+        const reviewStatusEl = detailEl.querySelector('[data-role="reviewStatus"]');
+        detailEl.querySelector('[data-role="submitReview"]').addEventListener("click", () => {
+          if (selectedStars < 1) {
+            reviewStatusEl.textContent = t("ratingRequired");
+            reviewStatusEl.className = "status-msg show err";
+            return;
+          }
+          const author = detailEl.querySelector('[data-role="reviewName"]').value.trim();
+          const comment = detailEl.querySelector('[data-role="reviewComment"]').value.trim();
+          fetch(`/api/restaurants/${r.id}/reviews`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rating: selectedStars, comment, author }),
+          })
+            .then((res) => {
+              if (!res.ok) throw new Error("failed");
+              return res.json();
+            })
+            .then(() => {
+              reviewStatusEl.textContent = t("reviewSuccess");
+              reviewStatusEl.className = "status-msg show ok";
+              detailEl.dataset.loaded = ""; // force reload of the detail panel next time
+              renderDetail(detailEl, r);
+              if (state.userLoc) fetchResults(); // refresh the card's rating summary too
+            })
+            .catch(() => {
+              reviewStatusEl.textContent = t("reviewError");
+              reviewStatusEl.className = "status-msg show err";
+            });
+        });
+      })
+      .catch(() => {
+        detailEl.innerHTML = `<div class="detail-row">${t("noHours")}</div>`;
+      });
   }
 
   const GMAPS_TRAVELMODE = { WALKING: "walking", DRIVING: "driving", TRANSIT: "transit" };

@@ -53,6 +53,12 @@
       lat: coords ? coords.lat : null,
       lng: coords ? coords.lng : null,
       accepted_currencies: selectedCurrencies,
+      hours: document.getElementById("hours").value.trim(),
+      menu_highlights: document
+        .getElementById("menuHighlights")
+        .value.split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
       note: document.getElementById("note").value.trim(),
       contact: document.getElementById("contact").value.trim(),
       source: "user_submitted",

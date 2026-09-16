@@ -459,3 +459,103 @@ button {
 @media (min-width: 720px) {
   #map { height: 340px; }
 }
+
+/* ---------- venue detail panel (hours / menu / reviews) ---------- */
+
+.detail-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--hairline);
+  color: var(--accent-mint);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 0 2px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.stall-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--hairline);
+  display: none;
+}
+.stall-detail.open { display: block; }
+
+.detail-row {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.detail-row strong { color: var(--text-primary); display: block; font-size: 12px; margin-bottom: 2px; }
+.detail-row ul { margin: 2px 0 0; padding-left: 18px; }
+
+.rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.rating-summary .stars { color: var(--accent-lantern); letter-spacing: 1px; }
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.review-item {
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.review-item .stars { color: var(--accent-lantern); font-size: 12px; }
+.review-item .review-author { color: var(--text-muted); font-size: 12px; margin-left: 6px; }
+.review-item .review-comment { margin-top: 4px; color: var(--text-primary); }
+
+.star-picker {
+  display: flex;
+  gap: 4px;
+}
+.star-picker button {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: var(--text-faint);
+  padding: 0;
+  line-height: 1;
+}
+.star-picker button.on { color: var(--accent-lantern); }
+
+.review-form input[type="text"],
+.review-form textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  margin-top: 6px;
+}
+.review-form textarea { min-height: 56px; resize: vertical; }
+.review-form .submit-btn.mint { padding: 10px; font-size: 13px; margin-top: 8px; }
+
+/* ---------- offline banner ---------- */
+
+.offline-banner {
+  display: none;
+  background: var(--accent-lantern-dim);
+  color: var(--accent-lantern);
+  font-size: 12px;
+  text-align: center;
+  padding: 8px 12px;
+}
+.offline-banner.show { display: block; }

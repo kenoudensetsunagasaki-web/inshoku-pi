@@ -94,6 +94,12 @@
       cuisine: document.getElementById("cuisine").value.trim(),
       phone: document.getElementById("phone").value.trim(),
       website: document.getElementById("website").value.trim(),
+      hours: document.getElementById("hours").value.trim(),
+      menu_highlights: document
+        .getElementById("menuHighlights")
+        .value.split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
       lat: coords.lat,
       lng: coords.lng,
       accepted_currencies: selectedCurrencies,

@@ -17,6 +17,7 @@
     loginBox.style.display = "none";
     panel.style.display = "block";
     loadPending();
+    loadReviews();
   }
 
   if (token) showPanel();
@@ -125,6 +126,12 @@
       lat: parseFloat(document.getElementById("lat").value),
       lng: parseFloat(document.getElementById("lng").value),
       cuisine: document.getElementById("cuisine").value.trim(),
+      hours: document.getElementById("hours").value.trim(),
+      menu_highlights: document
+        .getElementById("menuHighlights")
+        .value.split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
       accepted_currencies: [...grid.querySelectorAll("input:checked")].map((i) => i.value),
     };
     fetch("/api/admin/restaurants", {
@@ -138,5 +145,44 @@
         document.getElementById("addForm").reset();
       })
       .catch(() => showStatus("追加に失敗しました", false));
+  });
+
+  // ---- review moderation ----
+  function loadReviews() {
+    fetch("/api/admin/reviews", { headers: { "x-admin-token": token } })
+      .then((r) => r.json())
+      .then((data) => renderReviews(data.results || []));
+  }
+
+  function renderReviews(list) {
+    const el = document.getElementById("reviewsList");
+    const visible = list.filter((rv) => rv.status !== "hidden");
+    if (visible.length === 0) {
+      el.innerHTML = '<div class="empty-state">口コミはまだありません</div>';
+      return;
+    }
+    el.innerHTML = "";
+    visible.slice(0, 50).forEach((rv) => {
+      const card = document.createElement("div");
+      card.className = "stall-card";
+      card.dataset.tier = "community";
+      card.innerHTML = `
+        <div class="stall-name">${"★".repeat(rv.rating)}${"☆".repeat(5 - rv.rating)} — ${rv.restaurant_name}</div>
+        <div class="stall-meta">${rv.author || "匿名"}: ${rv.comment || "(コメントなし)"}</div>
+        <div class="stall-actions">
+          <button class="action-btn" data-rid="${rv.restaurant_id}" data-vid="${rv.id}" data-do="hide">非表示にする</button>
+        </div>
+      `;
+      el.appendChild(card);
+    });
+  }
+
+  document.getElementById("reviewsList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-do]");
+    if (!btn) return;
+    fetch(`/api/admin/restaurants/${btn.dataset.rid}/reviews/${btn.dataset.vid}/hide`, {
+      method: "POST",
+      headers: { "x-admin-token": token },
+    }).then(loadReviews);
   });
 })();
