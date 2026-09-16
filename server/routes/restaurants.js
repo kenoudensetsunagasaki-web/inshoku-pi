@@ -51,6 +51,44 @@ router.get("/:id", (req, res) => {
   res.json(r);
 });
 
+// POST /api/restaurants/:id/reviews  { rating: 1-5, comment, author }
+// Open to anyone, same trust level as the free "submit a tip" flow. Rating
+// and comment length are clamped server-side regardless of what's sent.
+router.post("/:id/reviews", (req, res) => {
+  const { rating, comment, author } = req.body || {};
+  const numRating = Number(rating);
+  if (!Number.isFinite(numRating) || numRating < 1 || numRating > 5) {
+    return res.status(400).json({ error: "rating must be a number from 1 to 5" });
+  }
+  const result = db.addReview(req.params.id, { rating: numRating, comment, author });
+  if (!result) return res.status(404).json({ error: "not found" });
+  res.status(201).json(result);
+});
+
+// PATCH /api/restaurants/mine/:id — store owner edits their own venue's
+// hours / menu highlights / phone / website / cuisine. Verified against
+// Pi's /v2/me the same way GET /mine is, so people can't edit listings
+// that aren't theirs by guessing an id.
+router.patch("/mine/:id", async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "missing Pi access token" });
+  try {
+    const meRes = await fetch(`${PI_API_BASE}/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!meRes.ok) return res.status(401).json({ error: "invalid Pi session" });
+    const me = await meRes.json();
+    const result = db.updateOwnListing(req.params.id, me.username, req.body || {});
+    if (result === "forbidden") return res.status(403).json({ error: "not your listing" });
+    if (!result) return res.status(404).json({ error: "not found" });
+    res.json(result);
+  } catch (err) {
+    console.error("mine update error:", err.message);
+    res.status(502).json({ error: "failed to verify Pi session" });
+  }
+});
+
 // POST /api/restaurants/:id/track  { event: "directions" | "gmaps" }
 // Fire-and-forget click tracking for the store-owner dashboard. No auth —
 // it's just an anonymous counter, same trust level as a page-view count.
@@ -77,6 +115,8 @@ router.post("/submit", (req, res) => {
     lat: body.lat ?? 0,
     lng: body.lng ?? 0,
     accepted_currencies: body.accepted_currencies,
+    hours: body.hours || "",
+    menu_highlights: Array.isArray(body.menu_highlights) ? body.menu_highlights : [],
     note: body.note || "",
     contact: body.contact || "",
     source: "user_submitted",

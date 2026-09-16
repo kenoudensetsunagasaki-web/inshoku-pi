@@ -54,6 +54,19 @@ router.post("/restaurants", requireAdmin, (req, res) => {
   res.status(201).json(record);
 });
 
+// GET /api/admin/reviews — every review across every listing, newest first,
+// for moderation (spam / abuse).
+router.get("/reviews", requireAdmin, (req, res) => {
+  res.json({ results: db.allReviews() });
+});
+
+// POST /api/admin/restaurants/:id/reviews/:reviewId/hide
+router.post("/restaurants/:id/reviews/:reviewId/hide", requireAdmin, (req, res) => {
+  const r = db.hideReview(req.params.id, req.params.reviewId);
+  if (!r) return res.status(404).json({ error: "not found" });
+  res.json(r);
+});
+
 // POST /api/admin/import/run  { source: "coinmap", lat, lng, radiusKm, autoApprove? }
 // Pulls candidate restaurants from an external directory and adds any new
 // ones (deduped by external_source+external_id). `source: "pi_directories"`
