@@ -13,6 +13,17 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// GET /api/config — lets the frontend know which capabilities are turned
+// on server-side, without ever letting the client decide sensitive things
+// (like whether registration is free) on its own. See FREE_REGISTRATION_TESTNET
+// in .env.example: flip it off once the Pi Developer Portal review passes and
+// the app is live on Mainnet, so real Pi payments are required again.
+app.get("/api/config", (req, res) => {
+  res.json({
+    freeRegistration: process.env.FREE_REGISTRATION_TESTNET === "true",
+  });
+});
+
 // API routes
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/payments", paymentRoutes);
