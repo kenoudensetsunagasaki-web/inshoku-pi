@@ -125,4 +125,43 @@ router.post("/submit", (req, res) => {
   res.status(201).json({ id: record.id });
 });
 
+// POST /api/restaurants/free-register — Testnet-period alternative to the
+// paid Pi flow in payments.js. Only works when the server-side
+// FREE_REGISTRATION_TESTNET switch is on (see .env.example); the client
+// cannot turn this on by itself. Still requires a valid Pi sign-in (same
+// /v2/me check as the /mine endpoints) so a listing is always tied to a
+// real Pi username, even though no payment changes hands.
+router.post("/free-register", async (req, res) => {
+  if (process.env.FREE_REGISTRATION_TESTNET !== "true") {
+    return res.status(403).json({ error: "free registration is not currently enabled" });
+  }
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "missing Pi access token" });
+  const restaurant = req.body || {};
+  if (!restaurant.name || !restaurant.address) {
+    return res.status(400).json({ error: "name and address are required" });
+  }
+  try {
+    const meRes = await fetch(`${PI_API_BASE}/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!meRes.ok) return res.status(401).json({ error: "invalid Pi session" });
+    const me = await meRes.json();
+    const record = db.insert({
+      ...restaurant,
+      source: "self_registered",
+      status: "verified",
+      submitted_by: me.username,
+      listing_paid: false,
+      listing_tx_id: null,
+      note: (restaurant.note ? restaurant.note + " / " : "") + "テストネット期間中の無料登録",
+    });
+    res.status(201).json({ id: record.id });
+  } catch (err) {
+    console.error("free-register error:", err.message);
+    res.status(502).json({ error: "failed to verify Pi session" });
+  }
+});
+
 module.exports = router;
