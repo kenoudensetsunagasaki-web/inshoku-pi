@@ -381,7 +381,7 @@
     fetch(`/api/restaurants/${r.id}`)
       .then((res) => res.json())
       .then((full) => {
-        const hoursHtml = `<div class="detail-row"><strong>${t("hours")}</strong>${escapeHtml(full.hours) || `<span style="color:var(--text-faint);">${t("noHours")}</span>`}</div>`;
+      const hoursHtml = `<div class="detail-row"><strong>${t("hours")}</strong>${full.hours ? escapeHtml(full.hours) : `<span style="color:var(--text-faint);">${t("noHours")}</span>`}</div>`;
         const menuItems = full.menu_highlights || [];
         const menuHtml = `<div class="detail-row"><strong>${t("menuHighlightsShort")}</strong>${
           menuItems.length
