@@ -79,6 +79,13 @@ function insert(restaurant) {
     external_id: restaurant.external_id || null,
     votes: restaurant.votes || { up: 0, down: 0 },
     stats: restaurant.stats || { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 },
+    // ---- richer venue info ----
+    hours: restaurant.hours || "", // freeform text, e.g. "月-金 11:00-22:00 / 土日 定休"
+    menu_highlights: Array.isArray(restaurant.menu_highlights) ? restaurant.menu_highlights : [],
+    // ---- reviews / ratings ----
+    reviews: Array.isArray(restaurant.reviews) ? restaurant.reviews : [],
+    rating_avg: restaurant.rating_avg || 0,
+    rating_count: restaurant.rating_count || 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -192,6 +199,81 @@ function pending() {
   return load().filter((r) => r.status === "pending");
 }
 
+function recomputeRating(record) {
+  const visible = (record.reviews || []).filter((rv) => rv.status !== "hidden");
+  record.rating_count = visible.length;
+  record.rating_avg = visible.length
+    ? Math.round((visible.reduce((sum, rv) => sum + rv.rating, 0) / visible.length) * 10) / 10
+    : 0;
+}
+
+// Reviews are open to anyone (no Pi sign-in required — same trust level as
+// the crowdsourced "submit a tip" flow), but are capped in length and rating
+// range at the route layer. Admins can hide abusive ones via hideReview.
+function addReview(restaurantId, { rating, comment, author }) {
+  const list = load();
+  const idx = list.findIndex((r) => r.id === restaurantId);
+  if (idx === -1) return null;
+  const review = {
+    id: crypto.randomUUID(),
+    rating: Math.max(1, Math.min(5, Math.round(rating))),
+    comment: (comment || "").slice(0, 280),
+    author: (author || "").slice(0, 40) || null,
+    status: "visible", // visible | hidden (admin-moderated)
+    created_at: new Date().toISOString(),
+  };
+  if (!list[idx].reviews) list[idx].reviews = [];
+  list[idx].reviews.push(review);
+  recomputeRating(list[idx]);
+  list[idx].updated_at = new Date().toISOString();
+  save(list);
+  return { restaurant: list[idx], review };
+}
+
+function hideReview(restaurantId, reviewId) {
+  const list = load();
+  const idx = list.findIndex((r) => r.id === restaurantId);
+  if (idx === -1) return null;
+  const review = (list[idx].reviews || []).find((rv) => rv.id === reviewId);
+  if (!review) return null;
+  review.status = "hidden";
+  recomputeRating(list[idx]);
+  list[idx].updated_at = new Date().toISOString();
+  save(list);
+  return list[idx];
+}
+
+// Every review across every restaurant, newest first — for the admin
+// moderation panel. Small dataset, so an in-memory flatten is fine.
+function allReviews() {
+  const list = load();
+  const out = [];
+  list.forEach((r) => {
+    (r.reviews || []).forEach((rv) => {
+      out.push({ ...rv, restaurant_id: r.id, restaurant_name: r.name });
+    });
+  });
+  return out.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+// Lets a store owner edit their own venue's richer info (hours, menu
+// highlights) without going through the admin queue. Verified against the
+// Pi-authenticated username by the route, not trusted from the client.
+const OWNER_EDITABLE_FIELDS = ["hours", "menu_highlights", "phone", "website", "cuisine"];
+function updateOwnListing(id, username, patch) {
+  const list = load();
+  const idx = list.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  if (list[idx].submitted_by !== username) return "forbidden";
+  const safePatch = {};
+  OWNER_EDITABLE_FIELDS.forEach((field) => {
+    if (patch[field] !== undefined) safePatch[field] = patch[field];
+  });
+  list[idx] = { ...list[idx], ...safePatch, updated_at: new Date().toISOString() };
+  save(list);
+  return list[idx];
+}
+
 module.exports = {
   all,
   getById,
@@ -205,4 +287,8 @@ module.exports = {
   incrementStat,
   extendExpiry,
   extendSponsor,
+  addReview,
+  hideReview,
+  allReviews,
+  updateOwnListing,
 };
