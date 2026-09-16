@@ -2,7 +2,7 @@
 // extending DICT with the same keys. Falls back to ja if a key is missing.
 const DICT = {
   ja: {
-    appName: "飲食.Pi",
+       appName: "PiFood & PiDrinks",
     tagline: "Piや暗号資産で払えるお店を探す",
     locateBtn: "現在地から探す",
     locating: "位置情報を取得中…",
@@ -110,7 +110,7 @@ const DICT = {
     myStoreFreeCampaign: "テストネット無料掲載中(期限なし)",
   },
   en: {
-    appName: "Inshoku.Pi",
+      appName: "PiFood & PiDrinks",
     tagline: "Find places that take Pi or crypto",
     locateBtn: "Search near me",
     locating: "Getting your location…",
