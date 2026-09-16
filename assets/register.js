@@ -11,9 +11,28 @@
     langToggle.textContent = getLocale() === "ja" ? "EN" : "日本語";
   });
 
-  const LISTING_FEE_PI = 1; // per month — see onReadyForServerCompletion below
+    const LISTING_FEE_PI = 1; // per month — see onReadyForServerCompletion below
   let piUser = null;
+  let piAccessToken = null;
   let coords = null;
+  let freeRegistration = false; // set from /api/config below — server-controlled, never client-decided
+
+  // ---- Testnet-period free registration banner ----
+  // Checked against the server on every load; the server is the only thing
+  // that can actually turn this on (see FREE_REGISTRATION_TESTNET in
+  // .env.example), so there's nothing to spoof by editing this file.
+  fetch("/api/config")
+    .then((r) => r.json())
+    .then((cfg) => {
+      freeRegistration = !!cfg.freeRegistration;
+      const banner = document.getElementById("freeRegistrationBanner");
+      if (freeRegistration && banner) {
+        banner.textContent = t("freeRegistrationBanner");
+        banner.classList.add("show");
+      }
+      if (freeRegistration) payBtn.textContent = t("payAndListFree");
+    })
+    .catch(() => {});
 
   // currency checkboxes
   const grid = document.getElementById("currencyGrid");
@@ -36,8 +55,9 @@
   (async function initPi() {
     try {
       await Pi.init({ version: "2.0", sandbox: false });
-      const auth = await Pi.authenticate(["username", "payments"], onIncompletePaymentFound);
+           const auth = await Pi.authenticate(["username", "payments"], onIncompletePaymentFound);
       piUser = auth.user;
+      piAccessToken = auth.accessToken;
       authStatusEl.textContent = `${t("piSignedIn")}: ${piUser.username}`;
       payBtn.disabled = false;
     } catch (e) {
@@ -107,8 +127,36 @@
       submitted_by: piUser.username,
     };
 
-    payBtn.disabled = true;
+       payBtn.disabled = true;
     payBtn.textContent = t("processingPayment");
+
+    // ---- Testnet period: skip Pi payment entirely, register for free ----
+    if (freeRegistration) {
+      fetch("/api/restaurants/free-register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${piAccessToken}`,
+        },
+        body: JSON.stringify(restaurant),
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error("failed");
+          return r.json();
+        })
+        .then(() => {
+          showStatus(t("regSuccess"), true);
+          payBtn.disabled = false;
+          payBtn.textContent = t("payAndListFree");
+          document.getElementById("regForm").reset();
+        })
+        .catch(() => {
+          showStatus(t("regError"), false);
+          payBtn.disabled = false;
+          payBtn.textContent = t("payAndListFree");
+        });
+      return;
+    }
 
     try {
       await Pi.createPayment(
