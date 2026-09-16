@@ -101,9 +101,13 @@ const DICT = {
     ratingRequired: "評価を選んでください",
     anonymous: "匿名",
     // offline / low data
-    offlineBanner: "オフラインです。最後に取得した検索結果を表示しています。",
+       offlineBanner: "オフラインです。最後に取得した検索結果を表示しています。",
     lowDataMode: "低速回線モード",
     lowDataModeOn: "地図を非表示にしてデータ通信量を抑えています。",
+    // testnet-period free registration
+    freeRegistrationBanner: "現在Testnet期間中のため、Pi決済不要で無料で店舗登録できます。Mainnet移行後は通常の掲載料(1π/月)が必要になります。",
+    payAndListFree: "無料で登録する",
+    myStoreFreeCampaign: "テストネット無料掲載中(期限なし)",
   },
   en: {
     appName: "Inshoku.Pi",
@@ -203,9 +207,13 @@ const DICT = {
     ratingRequired: "Please choose a rating",
     anonymous: "Anonymous",
     // offline / low data
-    offlineBanner: "You're offline. Showing the last results we fetched.",
+       offlineBanner: "You're offline. Showing the last results we fetched.",
     lowDataMode: "Low-data mode",
     lowDataModeOn: "Map hidden to save data.",
+    // testnet-period free registration
+    freeRegistrationBanner: "Free registration during the Testnet period — no Pi payment needed. The usual listing fee (1π/month) applies once we move to Mainnet.",
+    payAndListFree: "Register for free",
+    myStoreFreeCampaign: "Free Testnet listing (no expiry)",
   },
 };
 
