@@ -30,12 +30,12 @@ router.post("/approve", async (req, res) => {
   }
 });
 
-const LISTING_PERIOD_DAYS = 30;
+const LISTING_PERIOD_DAYS = 180; // 6 months
 const SPONSOR_PERIOD_DAYS = 30;
 
 // Pi calls this via onReadyForServerCompletion once the txid is on chain.
 // We complete the payment with Pi, then apply whichever effect this
-// payment was for: a brand-new listing, a monthly renewal, or a sponsor
+// payment was for: a brand-new listing, a 6-month renewal, or a sponsor
 // (featured placement) upgrade. `paymentType` tells us which.
 router.post("/complete", async (req, res) => {
   const { paymentId, txid, paymentType, restaurant, restaurantId } = req.body || {};
