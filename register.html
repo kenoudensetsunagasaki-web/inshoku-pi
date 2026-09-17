@@ -21,10 +21,10 @@
     <p class="subtitle" data-i18n="regSubtitle"></p>
 
     <div class="notice-box">
-      <strong data-i18n="listingFee">掲載料</strong>: <span id="feeLabel">1 π / 月</span> —
+           <strong data-i18n="listingFee">掲載料</strong>: <span id="feeLabel">1 π / 6ヶ月</span> —
       <span id="piAuthStatus" data-i18n="piRequired">Pi Browserでサインインしてから登録してください。</span>
       <br />
-           <span style="font-size:12px;">毎月自動で引き落とされるわけではありません。期限が近づいたら「<a href="/mystore.html" style="color:var(--accent-mint);">マイ店舗</a>」ページから更新してください(更新を忘れると掲載は非表示になります)。</span>
+           <span style="font-size:12px;">半年ごとの更新制です。自動で引き落とされるわけではないため、期限が近づいたら「<a href="/mystore.html" style="color:var(--accent-mint);">マイ店舗</a>」ページから更新してください(更新を忘れると掲載は非表示になります)。</span>
     </div>
     <div class="status-msg" id="freeRegistrationBanner"></div>
 
@@ -49,9 +49,13 @@
         <label data-i18n="phone">電話番号(任意)</label>
         <input type="tel" id="phone" />
       </div>
-      <div class="field">
+           <div class="field">
         <label data-i18n="website">ウェブサイト(任意)</label>
         <input type="url" id="website" placeholder="https://" />
+      </div>
+      <div class="field">
+        <label data-i18n="email">メールアドレス(任意・掲載期限のお知らせ用)</label>
+        <input type="email" id="email" placeholder="you@example.com" />
       </div>
       <div class="field">
         <label data-i18n="hours">営業時間</label>
