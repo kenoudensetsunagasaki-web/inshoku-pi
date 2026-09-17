@@ -57,7 +57,10 @@ function insert(restaurant) {
     address: restaurant.address || "",
     cuisine: restaurant.cuisine || "",
     phone: restaurant.phone || "",
-    website: restaurant.website || "",
+       website: restaurant.website || "",
+    // 店舗オーナーの連絡先メールアドレス(任意)。掲載期限が近づいた際の
+    // お知らせメール送信にのみ使用します(server/services/reminders.js参照)。
+    email: restaurant.email || "",
     lat: Number(restaurant.lat),
     lng: Number(restaurant.lng),
     accepted_currencies: restaurant.accepted_currencies || [],
@@ -69,7 +72,10 @@ function insert(restaurant) {
     // Pi has no silent auto-billing, so this is enforced by hiding the
     // listing from search once listing_expires_at passes, until the
     // owner comes back and pays to renew (see routes/payments.js).
-    listing_expires_at: restaurant.listing_expires_at || null,
+        listing_expires_at: restaurant.listing_expires_at || null,
+    // このサイクルで期限お知らせメールを送信済みかどうか。更新(延長)される
+    // たびにnullにリセットされます(下のextendExpiry参照)。
+    reminder_sent_at: restaurant.reminder_sent_at || null,
     sponsored: !!restaurant.sponsored,
     sponsored_until: restaurant.sponsored_until || null,
     submitted_by: restaurant.submitted_by || null,
@@ -176,8 +182,35 @@ function extendExpiry(id, days) {
   if (idx === -1) return null;
   const current = list[idx].listing_expires_at ? new Date(list[idx].listing_expires_at).getTime() : Date.now();
   const base = Math.max(current, Date.now()); // renewing early doesn't lose remaining days
-  list[idx].listing_expires_at = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
+   list[idx].listing_expires_at = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
+  list[idx].reminder_sent_at = null; // 更新したので次のサイクルでまたお知らせできるようにする
   list[idx].updated_at = new Date().toISOString();
+  save(list);
+  return list[idx];
+}
+
+// 自己登録・現在掲載中(verified)で、(a)メールアドレスが登録されており、
+// (b) daysAhead日以内に掲載期限が来て、(c) このサイクルではまだお知らせ
+// メールを送っていない店舗の一覧を返す。
+function dueForExpiryReminder(daysAhead) {
+  const now = Date.now();
+  const threshold = now + daysAhead * 24 * 60 * 60 * 1000;
+  return load().filter((r) => {
+    if (r.source !== "self_registered") return false;
+    if (r.status !== "verified") return false;
+    if (!r.email) return false;
+    if (!r.listing_expires_at) return false;
+    if (r.reminder_sent_at) return false;
+    const exp = new Date(r.listing_expires_at).getTime();
+    return exp > now && exp <= threshold;
+  });
+}
+
+function markReminderSent(id) {
+  const list = load();
+  const idx = list.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  list[idx].reminder_sent_at = new Date().toISOString();
   save(list);
   return list[idx];
 }
@@ -290,5 +323,7 @@ module.exports = {
   addReview,
   hideReview,
   allReviews,
-  updateOwnListing,
+    updateOwnListing,
+  dueForExpiryReminder,
+  markReminderSent,
 };
