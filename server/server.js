@@ -7,6 +7,7 @@ const paymentRoutes = require("./routes/payments");
 const adminRoutes = require("./routes/admin");
 const db = require("./db");
 const { fetchCoinmapVenues } = require("./importers/coinmap");
+const { checkAndSendExpiryReminders } = require("./services/reminders");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,10 +38,14 @@ app.listen(PORT, () => {
   if (!process.env.PI_API_KEY) {
     console.warn("⚠ PI_API_KEY is not set — Pi payments will fail. See .env.example.");
   }
-  if (!process.env.ADMIN_TOKEN) {
+   if (!process.env.ADMIN_TOKEN) {
     console.warn("⚠ ADMIN_TOKEN is not set — /admin.html will be unusable. See .env.example.");
   }
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+    console.warn("⚠ EMAIL_USER / EMAIL_APP_PASSWORD are not set — expiry reminder emails will be skipped. See .env.example.");
+  }
   startImportScheduler();
+  startExpiryReminderScheduler();
 });
 
 // Optional background import: set IMPORT_REGIONS to a JSON array like
@@ -84,8 +89,26 @@ function startImportScheduler() {
     }
   }
 
-  runOnce();
+    runOnce();
   setInterval(runOnce, intervalHours * 60 * 60 * 1000);
   console.log(`[import] background Coinmap import scheduled every ${intervalHours}h for ${regions.length} region(s).`);
+}
+
+// Runs the expiry-reminder check once at startup, then every 24h. Uses the
+// same checkAndSendExpiryReminders() as the manual /api/admin/check-expiring
+// endpoint, so a free external cron (e.g. cron-job.org) hitting that endpoint
+// and this in-process timer never do conflicting things — whichever runs
+// first for a given listing just marks it as sent, and the other sees
+// reminder_sent_at already set and skips it.
+function startExpiryReminderScheduler() {
+  checkAndSendExpiryReminders().catch((err) =>
+    console.error("[reminder] initial check failed:", err.message)
+  );
+  setInterval(() => {
+    checkAndSendExpiryReminders().catch((err) =>
+      console.error("[reminder] scheduled check failed:", err.message)
+    );
+  }, 24 * 60 * 60 * 1000);
+  console.log("[reminder] expiry reminder scheduler started (checks every 24h).");
 }
 
