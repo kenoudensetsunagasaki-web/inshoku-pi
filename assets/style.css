@@ -559,3 +559,17 @@ button {
   padding: 8px 12px;
 }
 .offline-banner.show { display: block; }
+
+/* ---------- legal pages ---------- */
+
+.legal-content { line-height: 1.7; }
+.legal-content h1 { margin-bottom: 4px; }
+.legal-content h2 { font-size: 15px; margin: 24px 0 8px; color: var(--text-primary); }
+.legal-content h2:first-of-type { margin-top: 0; }
+.legal-content p, .legal-content li { color: var(--text-muted); font-size: 13px; }
+.legal-content ul { padding-left: 18px; margin: 8px 0; }
+.legal-content .updated { color: var(--text-faint); font-size: 12px; margin-bottom: 16px; }
+
+.legal-links { text-align: center; padding: 10px 0 4px; font-size: 11px; }
+.legal-links a { color: var(--text-muted); text-decoration: none; margin: 0 4px; }
+.legal-links a:hover { color: var(--accent-mint); }
