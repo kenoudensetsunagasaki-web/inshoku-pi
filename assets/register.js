@@ -11,7 +11,7 @@
     langToggle.textContent = getLocale() === "ja" ? "EN" : "日本語";
   });
 
-    const LISTING_FEE_PI = 1; // per month — see onReadyForServerCompletion below
+        const LISTING_FEE_PI = 1; // per 6 months (180 days) — see onReadyForServerCompletion below
   let piUser = null;
   let piAccessToken = null;
   let coords = null;
@@ -113,7 +113,8 @@
       address: document.getElementById("address").value.trim(),
       cuisine: document.getElementById("cuisine").value.trim(),
       phone: document.getElementById("phone").value.trim(),
-      website: document.getElementById("website").value.trim(),
+           website: document.getElementById("website").value.trim(),
+      email: document.getElementById("email").value.trim(),
       hours: document.getElementById("hours").value.trim(),
       menu_highlights: document
         .getElementById("menuHighlights")
@@ -162,7 +163,7 @@
       await Pi.createPayment(
         {
           amount: LISTING_FEE_PI,
-          memo: `飲食.Pi listing (1st month): ${restaurant.name}`,
+                   memo: `飲食.Pi listing (6 months): ${restaurant.name}`,
           metadata: { type: "new_listing", restaurant },
         },
         {
