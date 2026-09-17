@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const { checkAndSendExpiryReminders } = require("../services/reminders");
 const { fetchCoinmapVenues } = require("../importers/coinmap");
 const { fetchCandidates: fetchPiCandidates } = require("../importers/pi-directories");
 
@@ -100,6 +101,19 @@ router.post("/import/run", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("import run error:", err.message);
     res.status(502).json({ error: "import failed: " + err.message });
+  }
+});
+
+// POST /api/admin/check-expiring — manually trigger (or have an external
+// cron service like cron-job.org call) the expiry-reminder check, instead
+// of waiting for the in-process daily scheduler in server.js.
+router.post("/check-expiring", requireAdmin, async (req, res) => {
+  try {
+    const result = await checkAndSendExpiryReminders();
+    res.json(result);
+  } catch (err) {
+    console.error("check-expiring error:", err.message);
+    res.status(500).json({ error: "check failed" });
   }
 });
 
