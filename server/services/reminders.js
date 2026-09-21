@@ -8,7 +8,7 @@ const { sendExpiryReminder } = require("./mailer");
 const REMINDER_DAYS_BEFORE = parseInt(process.env.REMINDER_DAYS_BEFORE || "14", 10);
 
 async function checkAndSendExpiryReminders() {
-  const due = db.dueForExpiryReminder(REMINDER_DAYS_BEFORE);
+  const due = await db.dueForExpiryReminder(REMINDER_DAYS_BEFORE);
   let sent = 0;
   for (const r of due) {
     try {
@@ -18,7 +18,7 @@ async function checkAndSendExpiryReminders() {
         expiresAt: r.listing_expires_at,
       });
       if (ok) {
-        db.markReminderSent(r.id);
+        await db.markReminderSent(r.id);
         sent++;
       }
     } catch (err) {
@@ -27,5 +27,4 @@ async function checkAndSendExpiryReminders() {
   }
   return { checked: due.length, sent };
 }
-
 module.exports = { checkAndSendExpiryReminders, REMINDER_DAYS_BEFORE };
