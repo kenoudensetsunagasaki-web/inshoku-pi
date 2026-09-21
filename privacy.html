@@ -29,7 +29,7 @@
       <ul>
         <li><strong>位置情報</strong>：現在地から近くの店舗を検索する機能のために、ブラウザの位置情報機能を通じて取得します。検索のためにサーバーへ送信されますが、個人を特定する情報と紐づけて保存することはありません。</li>
         <li><strong>Piアカウント情報</strong>：「Piでサインイン」を行った場合、Pi Network SDKを通じてPiのユーザー名（username）を取得します。店舗登録や決済（listing）を行う場合は、決済（payments）に関する情報も取り扱います。認証・決済処理自体はPi Network社のプラットフォーム上で行われます。</li>
-        <li><strong>店舗登録情報</strong>：店舗を登録する場合、店舗名、住所、電話番号（任意）、ウェブサイト（任意）、料理ジャンル、営業時間、おすすめメニュー、対応する決済通貨、位置座標、および登録者のPiユーザー名を取得します。</li>
+               <li><strong>店舗登録情報</strong>：店舗を登録する場合、店舗名、住所、電話番号（任意）、ウェブサイト（任意）、メールアドレス（任意）、料理ジャンル、営業時間、おすすめメニュー、対応する決済通貨、位置座標、および登録者のPiユーザー名を取得します。メールアドレスは、掲載期限が近づいた際のお知らせメール送信にのみ使用し、公開されることはありません。</li>
         <li><strong>情報提供（タレコミ）</strong>：Pi・暗号資産で支払える店舗の情報をご提供いただく際、確認した決済方法、メモ、連絡先（いずれも任意）を取得することがあります。サインインは不要で、匿名でのご提供も可能です。</li>
         <li><strong>口コミ・評価</strong>：評価（★1〜5）、コメント、お名前（いずれも任意、匿名可）を取得します。サインインは不要です。</li>
         <li><strong>利用状況の統計</strong>：店舗の検索結果への表示回数、「経路を見る」の利用回数、Googleマップ起動回数などを、店舗単位の統計情報として記録します。これらは個々の利用者を特定するものではありません。</li>
@@ -85,7 +85,7 @@
       <ul>
         <li><strong>Location data</strong>: used to search for nearby venues via your browser's geolocation feature. It is sent to our server to run the search but is not stored in a way that identifies you personally.</li>
         <li><strong>Pi account information</strong>: if you sign in with Pi, we receive your Pi username via the Pi Network SDK. Registering or paying for a listing also involves the payments scope; authentication and payment processing themselves are handled by Pi Network's own platform.</li>
-        <li><strong>Business registration information</strong>: when you register a business, we collect the business name, address, phone number (optional), website (optional), cuisine type, opening hours, menu highlights, accepted currencies, coordinates, and the Pi username of the person who registered it.</li>
+               <li><strong>Business registration information</strong>: when you register a business, we collect the business name, address, phone number (optional), website (optional), email address (optional), cuisine type, opening hours, menu highlights, accepted currencies, coordinates, and the Pi username of the person who registered it. The email address is used only to send a reminder before your listing expires, and is never shown publicly.</li>
         <li><strong>Tips</strong>: when you submit a tip about a venue that accepts Pi/crypto, we may collect the payment methods observed, an optional note, and optional contact information. No sign-in is required, and tips can be submitted anonymously.</li>
         <li><strong>Reviews</strong>: a star rating (1–5), an optional comment, and an optional name (anonymous is fine). No sign-in required.</li>
         <li><strong>Usage statistics</strong>: search impressions, "get directions" clicks, and Google Maps opens are recorded per listing as aggregate statistics; they do not identify individual visitors.</li>
