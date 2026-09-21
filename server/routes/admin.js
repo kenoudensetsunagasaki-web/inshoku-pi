@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const { checkAndSendExpiryReminders } = require("../services/reminders");
 const { fetchCoinmapVenues } = require("../importers/coinmap");
 const { fetchCandidates: fetchPiCandidates } = require("../importers/pi-directories");
+const { checkAndSendExpiryReminders } = require("../services/reminders");
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const IMPORTERS = {
@@ -25,47 +25,77 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-router.get("/restaurants/pending", requireAdmin, (req, res) => {
-  res.json({ results: db.pending() });
+router.get("/restaurants/pending", requireAdmin, async (req, res) => {
+  try {
+    res.json({ results: await db.pending() });
+  } catch (err) {
+    console.error("pending error:", err.message);
+    res.status(502).json({ error: "failed to load pending listings" });
+  }
 });
 
-router.post("/restaurants/:id/approve", requireAdmin, (req, res) => {
-  const r = db.update(req.params.id, { status: "verified", source: "admin" });
-  if (!r) return res.status(404).json({ error: "not found" });
-  res.json(r);
+router.post("/restaurants/:id/approve", requireAdmin, async (req, res) => {
+  try {
+    const r = await db.update(req.params.id, { status: "verified", source: "admin" });
+    if (!r) return res.status(404).json({ error: "not found" });
+    res.json(r);
+  } catch (err) {
+    console.error("approve error:", err.message);
+    res.status(502).json({ error: "approve failed" });
+  }
 });
 
-router.post("/restaurants/:id/reject", requireAdmin, (req, res) => {
-  const r = db.update(req.params.id, { status: "rejected" });
-  if (!r) return res.status(404).json({ error: "not found" });
-  res.json(r);
+router.post("/restaurants/:id/reject", requireAdmin, async (req, res) => {
+  try {
+    const r = await db.update(req.params.id, { status: "rejected" });
+    if (!r) return res.status(404).json({ error: "not found" });
+    res.json(r);
+  } catch (err) {
+    console.error("reject error:", err.message);
+    res.status(502).json({ error: "reject failed" });
+  }
 });
 
 // Manual entry by the operator — goes live immediately as admin-verified.
-router.post("/restaurants", requireAdmin, (req, res) => {
+router.post("/restaurants", requireAdmin, async (req, res) => {
   const body = req.body || {};
   if (!body.name || !body.address || body.lat == null || body.lng == null) {
     return res.status(400).json({ error: "name, address, lat and lng are required" });
   }
-  const record = db.insert({
-    ...body,
-    source: "admin",
-    status: "verified",
-  });
-  res.status(201).json(record);
+  try {
+    const record = await db.insert({
+      ...body,
+      source: "admin",
+      status: "verified",
+    });
+    res.status(201).json(record);
+  } catch (err) {
+    console.error("admin insert error:", err.message);
+    res.status(502).json({ error: "insert failed" });
+  }
 });
 
 // GET /api/admin/reviews — every review across every listing, newest first,
 // for moderation (spam / abuse).
-router.get("/reviews", requireAdmin, (req, res) => {
-  res.json({ results: db.allReviews() });
+router.get("/reviews", requireAdmin, async (req, res) => {
+  try {
+    res.json({ results: await db.allReviews() });
+  } catch (err) {
+    console.error("allReviews error:", err.message);
+    res.status(502).json({ error: "failed to load reviews" });
+  }
 });
 
 // POST /api/admin/restaurants/:id/reviews/:reviewId/hide
-router.post("/restaurants/:id/reviews/:reviewId/hide", requireAdmin, (req, res) => {
-  const r = db.hideReview(req.params.id, req.params.reviewId);
-  if (!r) return res.status(404).json({ error: "not found" });
-  res.json(r);
+router.post("/restaurants/:id/reviews/:reviewId/hide", requireAdmin, async (req, res) => {
+  try {
+    const r = await db.hideReview(req.params.id, req.params.reviewId);
+    if (!r) return res.status(404).json({ error: "not found" });
+    res.json(r);
+  } catch (err) {
+    console.error("hideReview error:", err.message);
+    res.status(502).json({ error: "hide failed" });
+  }
 });
 
 // POST /api/admin/import/run  { source: "coinmap", lat, lng, radiusKm, autoApprove? }
@@ -90,11 +120,11 @@ router.post("/import/run", requireAdmin, async (req, res) => {
     let imported = 0;
     let skipped = 0;
     for (const c of candidates) {
-      if (c.external_source && c.external_id && db.findByExternal(c.external_source, c.external_id)) {
+      if (c.external_source && c.external_id && (await db.findByExternal(c.external_source, c.external_id))) {
         skipped++;
         continue;
       }
-      db.insert({ ...c, status: shouldAutoApprove ? "verified" : "pending" });
+      await db.insert({ ...c, status: shouldAutoApprove ? "verified" : "pending" });
       imported++;
     }
     res.json({ found: candidates.length, imported, skipped, autoApproved: shouldAutoApprove });
@@ -105,8 +135,8 @@ router.post("/import/run", requireAdmin, async (req, res) => {
 });
 
 // POST /api/admin/check-expiring — manually trigger (or have an external
-// cron service like cron-job.org call) the expiry-reminder check, instead
-// of waiting for the in-process daily scheduler in server.js.
+// cron service like cron-job.org / UptimeRobot call) the expiry-reminder
+// check, instead of waiting for the in-process daily scheduler in server.js.
 router.post("/check-expiring", requireAdmin, async (req, res) => {
   try {
     const result = await checkAndSendExpiryReminders();
