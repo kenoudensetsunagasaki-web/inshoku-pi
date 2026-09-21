@@ -1,25 +1,42 @@
-// Minimal JSON-file data store. Good enough for a demo / early launch;
-// swap this module out for a real database (Postgres + PostGIS, etc.)
-// once listing volume grows — the function signatures below are the
-// seam to replace.
-const fs = require("fs");
-const path = require("path");
+// MongoDB-backed data store. Replaces the old JSON-file store — Render's
+// free tier disk is ephemeral (wiped on every redeploy/restart), so a local
+// JSON file cannot survive in production. MongoDB Atlas's free tier (M0)
+// persists indefinitely and is what this is written against.
+//
+// Design note: documents keep using our own `id` (crypto.randomUUID()) as
+// a plain field, exactly like the old JSON records did, instead of Mongo's
+// own `_id`. That way every other file that already does `restaurant.id` /
+// `db.getById(id)` / `{ id: record.id }` keeps working unchanged.
+const { MongoClient } = require("mongodb");
 const crypto = require("crypto");
 
-const DATA_FILE = path.join(__dirname, "data", "restaurants.json");
+const MONGODB_URI = process.env.MONGODB_URI || "";
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || "inshoku_pi";
+const COLLECTION = "restaurants";
 
-function load() {
-  if (!fs.existsSync(DATA_FILE)) return [];
-  const raw = fs.readFileSync(DATA_FILE, "utf-8");
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
+let client = null;
+let collection = null;
+
+// Call once at server startup (see server.js) before handling any requests.
+async function connect() {
+  if (collection) return collection;
+  if (!MONGODB_URI) {
+    throw new Error(
+      "MONGODB_URI is not set — see .env.example for how to get one from MongoDB Atlas's free tier."
+    );
   }
+  client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  const db = client.db(MONGODB_DB_NAME);
+  collection = db.collection(COLLECTION);
+  return collection;
 }
 
-function save(list) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
+function requireCollection() {
+  if (!collection) {
+    throw new Error("db.connect() has not completed yet — call it before handling requests.");
+  }
+  return collection;
 }
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -34,22 +51,26 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function all() {
-  return load();
+async function all() {
+  return requireCollection().find({}).toArray();
 }
 
-function getById(id) {
-  return load().find((r) => r.id === id);
+async function getById(id) {
+  return requireCollection().findOne({ id });
 }
 
-function findByExternal(externalSource, externalId) {
-  return load().find(
-    (r) => r.external_source === externalSource && r.external_id === externalId
-  );
+async function findByExternal(externalSource, externalId) {
+  return requireCollection().findOne({
+    external_source: externalSource,
+    external_id: externalId,
+  });
 }
 
-function insert(restaurant) {
-  const list = load();
+async function findBySubmitter(username) {
+  return requireCollection().find({ submitted_by: username }).toArray();
+}
+
+async function insert(restaurant) {
   const record = {
     id: restaurant.id || crypto.randomUUID(),
     name: restaurant.name || "",
@@ -57,67 +78,56 @@ function insert(restaurant) {
     address: restaurant.address || "",
     cuisine: restaurant.cuisine || "",
     phone: restaurant.phone || "",
-       website: restaurant.website || "",
-    // 店舗オーナーの連絡先メールアドレス(任意)。掲載期限が近づいた際の
-    // お知らせメール送信にのみ使用します(server/services/reminders.js参照)。
+    website: restaurant.website || "",
+    // Store owner's contact email — optional, only used to send a reminder
+    // before the listing expires (see services/reminders.js). Never sent
+    // back in any public API response — see routes/restaurants.js.
     email: restaurant.email || "",
     lat: Number(restaurant.lat),
     lng: Number(restaurant.lng),
     accepted_currencies: restaurant.accepted_currencies || [],
-    source: restaurant.source || "user_submitted", // admin | self_registered | user_submitted | coinmap_import
-    status: restaurant.status || "pending", // pending | verified | rejected
+    source: restaurant.source || "user_submitted",
+    status: restaurant.status || "pending",
     listing_paid: !!restaurant.listing_paid,
     listing_tx_id: restaurant.listing_tx_id || null,
-    // Self-registered listings are a recurring 1π/month subscription.
-    // Pi has no silent auto-billing, so this is enforced by hiding the
-    // listing from search once listing_expires_at passes, until the
-    // owner comes back and pays to renew (see routes/payments.js).
-        listing_expires_at: restaurant.listing_expires_at || null,
-    // このサイクルで期限お知らせメールを送信済みかどうか。更新(延長)される
-    // たびにnullにリセットされます(下のextendExpiry参照)。
+    listing_expires_at: restaurant.listing_expires_at || null,
     reminder_sent_at: restaurant.reminder_sent_at || null,
     sponsored: !!restaurant.sponsored,
     sponsored_until: restaurant.sponsored_until || null,
     submitted_by: restaurant.submitted_by || null,
     note: restaurant.note || "",
     contact: restaurant.contact || "",
-    external_source: restaurant.external_source || null, // e.g. "coinmap"
+    external_source: restaurant.external_source || null,
     external_id: restaurant.external_id || null,
     votes: restaurant.votes || { up: 0, down: 0 },
     stats: restaurant.stats || { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 },
-    // ---- richer venue info ----
-    hours: restaurant.hours || "", // freeform text, e.g. "月-金 11:00-22:00 / 土日 定休"
+    hours: restaurant.hours || "",
     menu_highlights: Array.isArray(restaurant.menu_highlights) ? restaurant.menu_highlights : [],
-    // ---- reviews / ratings ----
     reviews: Array.isArray(restaurant.reviews) ? restaurant.reviews : [],
     rating_avg: restaurant.rating_avg || 0,
     rating_count: restaurant.rating_count || 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  list.push(record);
-  save(list);
+  await requireCollection().insertOne(record);
   return record;
 }
 
-function update(id, patch) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx === -1) return null;
-  list[idx] = { ...list[idx], ...patch, updated_at: new Date().toISOString() };
-  save(list);
-  return list[idx];
+async function update(id, patch) {
+  const col = requireCollection();
+  const res = await col.updateOne(
+    { id },
+    { $set: { ...patch, updated_at: new Date().toISOString() } }
+  );
+  if (res.matchedCount === 0) return null;
+  return col.findOne({ id });
 }
 
-function search({ lat, lng, radiusKm, currencies, verifiedOnly }) {
-  // Both admin-verified and paid self-registered listings carry
-  // status "verified" — the frontend tells them apart via `source`
-  // and shows a different trust badge for each.
+async function search({ lat, lng, radiusKm, currencies, verifiedOnly }) {
+  const col = requireCollection();
   const now = Date.now();
-  const list = load().filter((r) => {
-    if (r.status !== "verified") return false;
-    // Self-registered listings are a monthly subscription — once the
-    // paid period lapses, they drop out of search until renewed.
+  const candidates = await col.find({ status: "verified" }).toArray();
+  const list = candidates.filter((r) => {
     if (r.source === "self_registered" && r.listing_expires_at) {
       if (new Date(r.listing_expires_at).getTime() < now) return false;
     }
@@ -137,25 +147,14 @@ function search({ lat, lng, radiusKm, currencies, verifiedOnly }) {
     .sort((a, b) => {
       const aSponsored = a.sponsored && a.sponsored_until && new Date(a.sponsored_until).getTime() > now;
       const bSponsored = b.sponsored && b.sponsored_until && new Date(b.sponsored_until).getTime() > now;
-      if (aSponsored !== bSponsored) return aSponsored ? -1 : 1; // sponsored listings float to the top
+      if (aSponsored !== bSponsored) return aSponsored ? -1 : 1;
       return a.distance_km - b.distance_km;
     });
 
-  // Count this as an "impression" for each listing that made it into the
-  // results — cheap analytics for the store-owner dashboard. Batched into
-  // a single read-modify-write instead of one per listing.
   try {
-    if (results.length > 0) {
-      const resultIds = new Set(results.map((r) => r.id));
-      const fullList = load();
-      fullList.forEach((r) => {
-        if (resultIds.has(r.id)) {
-          if (!r.stats) r.stats = { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 };
-          r.stats.impressions = (r.stats.impressions || 0) + 1;
-        }
-      });
-      save(fullList);
-    }
+    await Promise.all(
+      results.map((r) => col.updateOne({ id: r.id }, { $inc: { "stats.impressions": 1 } }))
+    );
   } catch (err) {
     console.error("impression tracking failed:", err.message);
   }
@@ -163,41 +162,41 @@ function search({ lat, lng, radiusKm, currencies, verifiedOnly }) {
   return results;
 }
 
-function findBySubmitter(username) {
-  return load().filter((r) => r.submitted_by === username);
+async function pending() {
+  return requireCollection().find({ status: "pending" }).toArray();
 }
 
-function incrementStat(id, field) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx === -1) return;
-  if (!list[idx].stats) list[idx].stats = { impressions: 0, directions_clicks: 0, gmaps_clicks: 0 };
-  list[idx].stats[field] = (list[idx].stats[field] || 0) + 1;
-  save(list);
+async function incrementStat(id, field) {
+  await requireCollection().updateOne({ id }, { $inc: { [`stats.${field}`]: 1 } });
 }
 
-function extendExpiry(id, days) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx === -1) return null;
-  const current = list[idx].listing_expires_at ? new Date(list[idx].listing_expires_at).getTime() : Date.now();
-  const base = Math.max(current, Date.now()); // renewing early doesn't lose remaining days
-   list[idx].listing_expires_at = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
-  list[idx].reminder_sent_at = null; // 更新したので次のサイクルでまたお知らせできるようにする
-  list[idx].updated_at = new Date().toISOString();
-  save(list);
-  return list[idx];
+async function extendExpiry(id, days) {
+  const col = requireCollection();
+  const doc = await col.findOne({ id });
+  if (!doc) return null;
+  const current = doc.listing_expires_at ? new Date(doc.listing_expires_at).getTime() : Date.now();
+  const base = Math.max(current, Date.now());
+  await col.updateOne(
+    { id },
+    {
+      $set: {
+        listing_expires_at: new Date(base + days * 24 * 60 * 60 * 1000).toISOString(),
+        reminder_sent_at: null,
+        updated_at: new Date().toISOString(),
+      },
+    }
+  );
+  return col.findOne({ id });
 }
 
-// 自己登録・現在掲載中(verified)で、(a)メールアドレスが登録されており、
-// (b) daysAhead日以内に掲載期限が来て、(c) このサイクルではまだお知らせ
-// メールを送っていない店舗の一覧を返す。
-function dueForExpiryReminder(daysAhead) {
+async function dueForExpiryReminder(daysAhead) {
+  const col = requireCollection();
   const now = Date.now();
   const threshold = now + daysAhead * 24 * 60 * 60 * 1000;
-  return load().filter((r) => {
-    if (r.source !== "self_registered") return false;
-    if (r.status !== "verified") return false;
+  const candidates = await col
+    .find({ source: "self_registered", status: "verified" })
+    .toArray();
+  return candidates.filter((r) => {
     if (!r.email) return false;
     if (!r.listing_expires_at) return false;
     if (r.reminder_sent_at) return false;
@@ -206,80 +205,79 @@ function dueForExpiryReminder(daysAhead) {
   });
 }
 
-function markReminderSent(id) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx === -1) return null;
-  list[idx].reminder_sent_at = new Date().toISOString();
-  save(list);
-  return list[idx];
+async function markReminderSent(id) {
+  const col = requireCollection();
+  await col.updateOne({ id }, { $set: { reminder_sent_at: new Date().toISOString() } });
+  return col.findOne({ id });
 }
 
-function extendSponsor(id, days) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx === -1) return null;
-  const current = list[idx].sponsored_until ? new Date(list[idx].sponsored_until).getTime() : Date.now();
+async function extendSponsor(id, days) {
+  const col = requireCollection();
+  const doc = await col.findOne({ id });
+  if (!doc) return null;
+  const current = doc.sponsored_until ? new Date(doc.sponsored_until).getTime() : Date.now();
   const base = Math.max(current, Date.now());
-  list[idx].sponsored = true;
-  list[idx].sponsored_until = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
-  list[idx].updated_at = new Date().toISOString();
-  save(list);
-  return list[idx];
+  await col.updateOne(
+    { id },
+    {
+      $set: {
+        sponsored: true,
+        sponsored_until: new Date(base + days * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    }
+  );
+  return col.findOne({ id });
 }
 
-function pending() {
-  return load().filter((r) => r.status === "pending");
-}
-
-function recomputeRating(record) {
-  const visible = (record.reviews || []).filter((rv) => rv.status !== "hidden");
-  record.rating_count = visible.length;
-  record.rating_avg = visible.length
+function recomputeRatingFields(reviews) {
+  const visible = (reviews || []).filter((rv) => rv.status !== "hidden");
+  const rating_count = visible.length;
+  const rating_avg = visible.length
     ? Math.round((visible.reduce((sum, rv) => sum + rv.rating, 0) / visible.length) * 10) / 10
     : 0;
+  return { rating_avg, rating_count };
 }
 
-// Reviews are open to anyone (no Pi sign-in required — same trust level as
-// the crowdsourced "submit a tip" flow), but are capped in length and rating
-// range at the route layer. Admins can hide abusive ones via hideReview.
-function addReview(restaurantId, { rating, comment, author }) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === restaurantId);
-  if (idx === -1) return null;
+async function addReview(restaurantId, { rating, comment, author }) {
+  const col = requireCollection();
+  const doc = await col.findOne({ id: restaurantId });
+  if (!doc) return null;
   const review = {
     id: crypto.randomUUID(),
     rating: Math.max(1, Math.min(5, Math.round(rating))),
     comment: (comment || "").slice(0, 280),
     author: (author || "").slice(0, 40) || null,
-    status: "visible", // visible | hidden (admin-moderated)
+    status: "visible",
     created_at: new Date().toISOString(),
   };
-  if (!list[idx].reviews) list[idx].reviews = [];
-  list[idx].reviews.push(review);
-  recomputeRating(list[idx]);
-  list[idx].updated_at = new Date().toISOString();
-  save(list);
-  return { restaurant: list[idx], review };
+  const reviews = [...(doc.reviews || []), review];
+  const { rating_avg, rating_count } = recomputeRatingFields(reviews);
+  await col.updateOne(
+    { id: restaurantId },
+    { $set: { reviews, rating_avg, rating_count, updated_at: new Date().toISOString() } }
+  );
+  const updated = await col.findOne({ id: restaurantId });
+  return { restaurant: updated, review };
 }
 
-function hideReview(restaurantId, reviewId) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === restaurantId);
-  if (idx === -1) return null;
-  const review = (list[idx].reviews || []).find((rv) => rv.id === reviewId);
+async function hideReview(restaurantId, reviewId) {
+  const col = requireCollection();
+  const doc = await col.findOne({ id: restaurantId });
+  if (!doc) return null;
+  const review = (doc.reviews || []).find((rv) => rv.id === reviewId);
   if (!review) return null;
-  review.status = "hidden";
-  recomputeRating(list[idx]);
-  list[idx].updated_at = new Date().toISOString();
-  save(list);
-  return list[idx];
+  const reviews = doc.reviews.map((rv) => (rv.id === reviewId ? { ...rv, status: "hidden" } : rv));
+  const { rating_avg, rating_count } = recomputeRatingFields(reviews);
+  await col.updateOne(
+    { id: restaurantId },
+    { $set: { reviews, rating_avg, rating_count, updated_at: new Date().toISOString() } }
+  );
+  return col.findOne({ id: restaurantId });
 }
 
-// Every review across every restaurant, newest first — for the admin
-// moderation panel. Small dataset, so an in-memory flatten is fine.
-function allReviews() {
-  const list = load();
+async function allReviews() {
+  const list = await requireCollection().find({}).toArray();
   const out = [];
   list.forEach((r) => {
     (r.reviews || []).forEach((rv) => {
@@ -289,25 +287,22 @@ function allReviews() {
   return out.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
-// Lets a store owner edit their own venue's richer info (hours, menu
-// highlights) without going through the admin queue. Verified against the
-// Pi-authenticated username by the route, not trusted from the client.
 const OWNER_EDITABLE_FIELDS = ["hours", "menu_highlights", "phone", "website", "cuisine"];
-function updateOwnListing(id, username, patch) {
-  const list = load();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx === -1) return null;
-  if (list[idx].submitted_by !== username) return "forbidden";
+async function updateOwnListing(id, username, patch) {
+  const col = requireCollection();
+  const doc = await col.findOne({ id });
+  if (!doc) return null;
+  if (doc.submitted_by !== username) return "forbidden";
   const safePatch = {};
   OWNER_EDITABLE_FIELDS.forEach((field) => {
     if (patch[field] !== undefined) safePatch[field] = patch[field];
   });
-  list[idx] = { ...list[idx], ...safePatch, updated_at: new Date().toISOString() };
-  save(list);
-  return list[idx];
+  await col.updateOne({ id }, { $set: { ...safePatch, updated_at: new Date().toISOString() } });
+  return col.findOne({ id });
 }
 
 module.exports = {
+  connect,
   all,
   getById,
   findByExternal,
@@ -323,7 +318,7 @@ module.exports = {
   addReview,
   hideReview,
   allReviews,
-    updateOwnListing,
+  updateOwnListing,
   dueForExpiryReminder,
   markReminderSent,
 };
