@@ -4,7 +4,7 @@
 // network-first-with-cache-fallback for API calls (so a stale list of
 // restaurants beats a blank screen when offline, but fresh data is used
 // whenever the network is actually available).
-const CACHE_VERSION = "inshoku-pi-v1";
+const CACHE_VERSION = "inshoku-pi-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
