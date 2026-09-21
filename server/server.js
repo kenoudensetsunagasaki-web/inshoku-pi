@@ -12,6 +12,12 @@ const { checkAndSendExpiryReminders } = require("./services/reminders");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Render sits in front of this app behind its own proxy, so without this,
+// req.ip would show Render's proxy address for every visitor instead of
+// their real IP — which would make the per-IP rate limiting in
+// routes/restaurants.js useless (everyone would share one bucket).
+app.set("trust proxy", true);
+
 app.use(express.json());
 
 // GET /api/config — lets the frontend know which capabilities are turned
@@ -33,19 +39,32 @@ app.use("/api/admin", adminRoutes);
 // Static frontend (index.html, register.html, submit.html, admin.html, assets/)
 app.use(express.static(path.join(__dirname, "..")));
 
-app.listen(PORT, () => {
-  console.log(`飲食.Pi server listening on http://localhost:${PORT}`);
-  if (!process.env.PI_API_KEY) {
-    console.warn("⚠ PI_API_KEY is not set — Pi payments will fail. See .env.example.");
-  }
-   if (!process.env.ADMIN_TOKEN) {
-    console.warn("⚠ ADMIN_TOKEN is not set — /admin.html will be unusable. See .env.example.");
-  }
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
-    console.warn("⚠ EMAIL_USER / EMAIL_APP_PASSWORD are not set — expiry reminder emails will be skipped. See .env.example.");
-  }
-  startImportScheduler();
-  startExpiryReminderScheduler();
+// MongoDB Atlas connection must be ready before we start accepting
+// requests — every route handler now awaits a db.* call. See db.js and
+// .env.example (MONGODB_URI) for setup.
+async function main() {
+  await db.connect();
+  console.log("✓ Connected to MongoDB");
+
+  app.listen(PORT, () => {
+    console.log(`飲食.Pi server listening on http://localhost:${PORT}`);
+    if (!process.env.PI_API_KEY) {
+      console.warn("⚠ PI_API_KEY is not set — Pi payments will fail. See .env.example.");
+    }
+    if (!process.env.ADMIN_TOKEN) {
+      console.warn("⚠ ADMIN_TOKEN is not set — /admin.html will be unusable. See .env.example.");
+    }
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+      console.warn("⚠ EMAIL_USER / EMAIL_APP_PASSWORD are not set — expiry reminder emails will be skipped. See .env.example.");
+    }
+    startImportScheduler();
+    startExpiryReminderScheduler();
+  });
+}
+
+main().catch((err) => {
+  console.error("✗ Failed to start server:", err.message);
+  process.exit(1);
 });
 
 // Optional background import: set IMPORT_REGIONS to a JSON array like
@@ -78,8 +97,8 @@ function startImportScheduler() {
         });
         let imported = 0;
         for (const c of candidates) {
-          if (db.findByExternal(c.external_source, c.external_id)) continue;
-          db.insert({ ...c, status: autoApprove ? "verified" : "pending" });
+          if (await db.findByExternal(c.external_source, c.external_id)) continue;
+          await db.insert({ ...c, status: autoApprove ? "verified" : "pending" });
           imported++;
         }
         console.log(`[import] ${region.name || "region"}: +${imported} new (of ${candidates.length} found)`);
@@ -89,7 +108,7 @@ function startImportScheduler() {
     }
   }
 
-    runOnce();
+  runOnce();
   setInterval(runOnce, intervalHours * 60 * 60 * 1000);
   console.log(`[import] background Coinmap import scheduled every ${intervalHours}h for ${regions.length} region(s).`);
 }
@@ -111,4 +130,3 @@ function startExpiryReminderScheduler() {
   }, 24 * 60 * 60 * 1000);
   console.log("[reminder] expiry reminder scheduler started (checks every 24h).");
 }
-
