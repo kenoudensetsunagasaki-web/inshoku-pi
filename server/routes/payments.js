@@ -56,7 +56,7 @@ router.post("/complete", async (req, res) => {
     // below (restaurant payload, restaurantId, and the implied amount).
     if (paymentType === "new_listing") {
       if (!restaurant) return res.status(400).json({ error: "restaurant is required" });
-      const record = db.insert({
+      const record = await db.insert({
         ...restaurant,
         source: "self_registered",
         status: "verified", // paid listings go live immediately as "self-listed"
@@ -69,14 +69,14 @@ router.post("/complete", async (req, res) => {
 
     if (paymentType === "renewal") {
       if (!restaurantId) return res.status(400).json({ error: "restaurantId is required" });
-      const record = db.extendExpiry(restaurantId, LISTING_PERIOD_DAYS);
+      const record = await db.extendExpiry(restaurantId, LISTING_PERIOD_DAYS);
       if (!record) return res.status(404).json({ error: "listing not found" });
       return res.json({ id: record.id, listing_expires_at: record.listing_expires_at });
     }
 
     if (paymentType === "sponsor") {
       if (!restaurantId) return res.status(400).json({ error: "restaurantId is required" });
-      const record = db.extendSponsor(restaurantId, SPONSOR_PERIOD_DAYS);
+      const record = await db.extendSponsor(restaurantId, SPONSOR_PERIOD_DAYS);
       if (!record) return res.status(404).json({ error: "listing not found" });
       return res.json({ id: record.id, sponsored_until: record.sponsored_until });
     }
