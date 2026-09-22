@@ -75,7 +75,44 @@
     }).catch(() => {});
   }
 
-  // ---- coordinates ----
+   // ---- coordinates ----
+  // Option 1: geocode the typed address (via OpenStreetMap's free Nominatim
+  // API — no API key needed) so an owner can register without having to
+  // physically stand at the store.
+  document.getElementById("geocodeBtn").addEventListener("click", async () => {
+    const address = document.getElementById("address").value.trim();
+    if (!address) {
+      alert(t("required"));
+      return;
+    }
+    const btn = document.getElementById("geocodeBtn");
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = t("geocoding");
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`
+      );
+      const data = await res.json();
+      if (!data.length) {
+        alert(t("geocodeError"));
+        return;
+      }
+      coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      document.getElementById("lat").value = coords.lat;
+      document.getElementById("lng").value = coords.lng;
+      document.getElementById("coordsPreview").textContent =
+        `${t("coordsCaptured")}: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+    } catch (err) {
+      alert(t("geocodeError"));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+
+  // Option 2: use the device's actual GPS location (more accurate when
+  // physically on-site, but requires being there).
   document.getElementById("useLocationBtn").addEventListener("click", () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
