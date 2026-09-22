@@ -75,7 +75,7 @@
     card.className = "stall-card";
     card.dataset.tier = r.source === "self_registered" ? "self" : "admin";
 
-       const expDays = daysLeft(r.listing_expires_at);
+    const expDays = daysLeft(r.listing_expires_at);
     const expired = expDays != null && expDays < 0;
     const sponsorDays = daysLeft(r.sponsored_until);
     const isSponsored = r.sponsored && sponsorDays != null && sponsorDays > 0;
@@ -111,6 +111,30 @@
       <button class="detail-toggle" data-action="toggleEdit">${t("myStoreEditInfo")}</button>
       <div class="stall-detail" data-role="editPanel">
         <div class="field">
+          <label data-i18n="storeName">${t("storeName")}</label>
+          <input type="text" data-role="editName" value="${escapeHtml(r.name || "")}" />
+        </div>
+        <div class="field">
+          <label data-i18n="storeNameEn">${t("storeNameEn")}</label>
+          <input type="text" data-role="editNameEn" value="${escapeHtml(r.name_en || "")}" />
+        </div>
+        <div class="field">
+          <label data-i18n="address">${t("address")}</label>
+          <input type="text" data-role="editAddress" value="${escapeHtml(r.address || "")}" />
+        </div>
+        <div class="field">
+          <label data-i18n="cuisine">${t("cuisine")}</label>
+          <input type="text" data-role="editCuisine" value="${escapeHtml(r.cuisine || "")}" />
+        </div>
+        <div class="field">
+          <label data-i18n="phone">${t("phone")}</label>
+          <input type="tel" data-role="editPhone" value="${escapeHtml(r.phone || "")}" />
+        </div>
+        <div class="field">
+          <label data-i18n="website">${t("website")}</label>
+          <input type="url" data-role="editWebsite" value="${escapeHtml(r.website || "")}" />
+        </div>
+        <div class="field">
           <label data-i18n="hours">${t("hours")}</label>
           <input type="text" data-role="editHours" value="${escapeHtml(r.hours || "")}" placeholder="${t("hoursPlaceholder")}" />
         </div>
@@ -118,13 +142,84 @@
           <label>${t("menuHighlights")}</label>
           <textarea data-role="editMenu" placeholder="${t("menuHighlightsPlaceholder")}">${escapeHtml((r.menu_highlights || []).join("\n"))}</textarea>
         </div>
+        <div class="field">
+          <label data-i18n="currencies">${t("currencies")}</label>
+          <div class="checkbox-grid" data-role="editCurrencyGrid"></div>
+        </div>
+        <div class="field">
+          <label data-i18n="address">緯度・経度</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="action-btn" data-action="editGeocode">${t("geocodeFromAddress")}</button>
+            <button type="button" class="action-btn" data-action="editUseLocation">${t("useMyLocation")}</button>
+          </div>
+          <div class="stall-meta" data-role="editCoordsPreview" style="margin-top:8px;">${
+            r.lat != null && r.lng != null ? `${t("coordsCaptured")}: ${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}` : ""
+          }</div>
+        </div>
         <div class="stall-actions">
           <button class="action-btn primary" data-action="saveEdit">${t("myStoreEditSave")}</button>
         </div>
         <div class="status-msg" data-role="editMsg"></div>
+        <hr style="border:none;border-top:1px solid var(--border-color, #333);margin:16px 0;" />
+        <button class="action-btn" data-action="deleteListing" style="color:var(--accent-danger);border-color:var(--accent-danger);">${t("myStoreDelete")}</button>
       </div>
       <div class="status-msg" data-role="msg"></div>
     `;
+
+    // Populate the currency checkboxes, pre-checking whatever this listing
+    // already accepts.
+    const editCurrencyGrid = card.querySelector('[data-role="editCurrencyGrid"]');
+    const acceptedSet = new Set(r.accepted_currencies || []);
+    CURRENCIES.forEach((c) => {
+      const label = document.createElement("label");
+      label.innerHTML = `<input type="checkbox" value="${c.code}" ${acceptedSet.has(c.code) ? "checked" : ""} /> ${c.symbol} ${c.label}`;
+      editCurrencyGrid.appendChild(label);
+    });
+
+    // Local working copy of this listing's coordinates — updated by the
+    // geocode/location buttons below, sent along on save.
+    let editCoords = { lat: r.lat, lng: r.lng };
+    const editCoordsPreview = card.querySelector('[data-role="editCoordsPreview"]');
+
+    card.querySelector('[data-action="editGeocode"]').addEventListener("click", async (e) => {
+      const address = card.querySelector('[data-role="editAddress"]').value.trim();
+      if (!address) {
+        alert(t("required"));
+        return;
+      }
+      const btn = e.currentTarget;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = t("geocoding");
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`
+        );
+        const data = await res.json();
+        if (!data.length) {
+          alert(t("geocodeError"));
+          return;
+        }
+        editCoords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        editCoordsPreview.textContent = `${t("coordsCaptured")}: ${editCoords.lat.toFixed(5)}, ${editCoords.lng.toFixed(5)}`;
+      } catch (err) {
+        alert(t("geocodeError"));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    });
+
+    card.querySelector('[data-action="editUseLocation"]').addEventListener("click", () => {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          editCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          editCoordsPreview.textContent = `${t("coordsCaptured")}: ${editCoords.lat.toFixed(5)}, ${editCoords.lng.toFixed(5)}`;
+        },
+        (err) => alert("Could not get location: " + err.message)
+      );
+    });
 
     const editPanel = card.querySelector('[data-role="editPanel"]');
     card.querySelector('[data-action="toggleEdit"]').addEventListener("click", (e) => {
@@ -134,19 +229,43 @@
 
     const editMsgEl = card.querySelector('[data-role="editMsg"]');
     card.querySelector('[data-action="saveEdit"]').addEventListener("click", () => {
+      const name = card.querySelector('[data-role="editName"]').value.trim();
+      const name_en = card.querySelector('[data-role="editNameEn"]').value.trim();
+      const address = card.querySelector('[data-role="editAddress"]').value.trim();
+      const cuisine = card.querySelector('[data-role="editCuisine"]').value.trim();
+      const phone = card.querySelector('[data-role="editPhone"]').value.trim();
+      const website = card.querySelector('[data-role="editWebsite"]').value.trim();
       const hours = card.querySelector('[data-role="editHours"]').value.trim();
       const menu_highlights = card
         .querySelector('[data-role="editMenu"]')
         .value.split("\n")
         .map((line) => line.trim())
         .filter(Boolean);
+      const accepted_currencies = [...editCurrencyGrid.querySelectorAll("input:checked")].map((i) => i.value);
+
+      const patch = {
+        name,
+        name_en,
+        address,
+        cuisine,
+        phone,
+        website,
+        hours,
+        menu_highlights,
+        accepted_currencies,
+      };
+      if (editCoords && editCoords.lat != null && editCoords.lng != null) {
+        patch.lat = editCoords.lat;
+        patch.lng = editCoords.lng;
+      }
+
       fetch(`/api/restaurants/mine/${r.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${state.accessToken}`,
         },
-        body: JSON.stringify({ hours, menu_highlights }),
+        body: JSON.stringify(patch),
       })
         .then((res) => {
           if (!res.ok) throw new Error("failed");
@@ -155,9 +274,31 @@
         .then(() => {
           editMsgEl.textContent = t("myStoreEditSuccess");
           editMsgEl.className = "status-msg show ok";
+          loadMine();
         })
         .catch(() => {
           editMsgEl.textContent = t("myStorePayError");
+          editMsgEl.className = "status-msg show err";
+        });
+    });
+
+    card.querySelector('[data-action="deleteListing"]').addEventListener("click", () => {
+      if (!confirm(t("myStoreDeleteConfirm"))) return;
+      fetch(`/api/restaurants/mine/${r.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${state.accessToken}` },
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("failed");
+          return res.json();
+        })
+        .then(() => {
+          editMsgEl.textContent = t("myStoreDeleteSuccess");
+          editMsgEl.className = "status-msg show ok";
+          loadMine();
+        })
+        .catch(() => {
+          editMsgEl.textContent = t("myStoreDeleteError");
           editMsgEl.className = "status-msg show err";
         });
     });
@@ -168,7 +309,7 @@
       msgEl.className = "status-msg show " + (ok ? "ok" : "err");
     }
 
-       const renewBtn = card.querySelector('[data-action="renew"]');
+    const renewBtn = card.querySelector('[data-action="renew"]');
     if (renewBtn) {
       renewBtn.addEventListener("click", () => {
         payFor(r.id, "renewal", RENEWAL_FEE_PI, `飲食.Pi renewal: ${r.name}`, showMsg);
