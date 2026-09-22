@@ -152,9 +152,11 @@
             <button type="button" class="action-btn" data-action="editGeocode">${t("geocodeFromAddress")}</button>
             <button type="button" class="action-btn" data-action="editUseLocation">${t("useMyLocation")}</button>
           </div>
-          <div class="stall-meta" data-role="editCoordsPreview" style="margin-top:8px;">${
-            r.lat != null && r.lng != null ? `${t("coordsCaptured")}: ${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}` : ""
-          }</div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <input type="number" step="any" data-role="editLat" value="${r.lat != null ? r.lat : ""}" placeholder="緯度 / Lat" style="flex:1;" />
+            <input type="number" step="any" data-role="editLng" value="${r.lng != null ? r.lng : ""}" placeholder="経度 / Lng" style="flex:1;" />
+          </div>
+          <div class="stall-meta" style="margin-top:4px;font-size:12px;">${t("manualCoordsHint")}</div>
         </div>
         <div class="stall-actions">
           <button class="action-btn primary" data-action="saveEdit">${t("myStoreEditSave")}</button>
@@ -176,10 +178,12 @@
       editCurrencyGrid.appendChild(label);
     });
 
-    // Local working copy of this listing's coordinates — updated by the
-    // geocode/location buttons below, sent along on save.
-    let editCoords = { lat: r.lat, lng: r.lng };
-    const editCoordsPreview = card.querySelector('[data-role="editCoordsPreview"]');
+    // Coordinates are plain editable number inputs — the geocode/location
+    // buttons just fill them in, but the owner can also type coordinates in
+    // directly (e.g. looked up on Google Maps) when automatic lookup can't
+    // find an address.
+    const editLatInput = card.querySelector('[data-role="editLat"]');
+    const editLngInput = card.querySelector('[data-role="editLng"]');
 
     card.querySelector('[data-action="editGeocode"]').addEventListener("click", async (e) => {
       const address = card.querySelector('[data-role="editAddress"]').value.trim();
@@ -200,8 +204,8 @@
           alert(t("geocodeError"));
           return;
         }
-        editCoords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-        editCoordsPreview.textContent = `${t("coordsCaptured")}: ${editCoords.lat.toFixed(5)}, ${editCoords.lng.toFixed(5)}`;
+        editLatInput.value = parseFloat(data[0].lat);
+        editLngInput.value = parseFloat(data[0].lon);
       } catch (err) {
         alert(t("geocodeError"));
       } finally {
@@ -214,8 +218,8 @@
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          editCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          editCoordsPreview.textContent = `${t("coordsCaptured")}: ${editCoords.lat.toFixed(5)}, ${editCoords.lng.toFixed(5)}`;
+          editLatInput.value = pos.coords.latitude;
+          editLngInput.value = pos.coords.longitude;
         },
         (err) => alert("Could not get location: " + err.message)
       );
@@ -228,7 +232,7 @@
     });
 
     const editMsgEl = card.querySelector('[data-role="editMsg"]');
-    card.querySelector('[data-action="saveEdit"]').addEventListener("click", () => {
+    card.querySelector('[data-action="saveEdit"]').addEventListener("click", async () => {
       const name = card.querySelector('[data-role="editName"]').value.trim();
       const name_en = card.querySelector('[data-role="editNameEn"]').value.trim();
       const address = card.querySelector('[data-role="editAddress"]').value.trim();
@@ -243,6 +247,29 @@
         .filter(Boolean);
       const accepted_currencies = [...editCurrencyGrid.querySelectorAll("input:checked")].map((i) => i.value);
 
+      // Same auto-lookup fallback as the registration form: if the
+      // coordinate fields are empty (e.g. address changed but coords
+      // weren't refreshed), try geocoding the address automatically before
+      // giving up.
+      let latVal = parseFloat(editLatInput.value);
+      let lngVal = parseFloat(editLngInput.value);
+      if ((Number.isNaN(latVal) || Number.isNaN(lngVal)) && address) {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`
+          );
+          const data = await res.json();
+          if (data.length) {
+            latVal = parseFloat(data[0].lat);
+            lngVal = parseFloat(data[0].lon);
+            editLatInput.value = latVal;
+            editLngInput.value = lngVal;
+          }
+        } catch (err) {
+          // fall through — patch just won't include lat/lng this time
+        }
+      }
+
       const patch = {
         name,
         name_en,
@@ -254,107 +281,4 @@
         menu_highlights,
         accepted_currencies,
       };
-      if (editCoords && editCoords.lat != null && editCoords.lng != null) {
-        patch.lat = editCoords.lat;
-        patch.lng = editCoords.lng;
-      }
-
-      fetch(`/api/restaurants/mine/${r.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${state.accessToken}`,
-        },
-        body: JSON.stringify(patch),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("failed");
-          return res.json();
-        })
-        .then(() => {
-          editMsgEl.textContent = t("myStoreEditSuccess");
-          editMsgEl.className = "status-msg show ok";
-          loadMine();
-        })
-        .catch(() => {
-          editMsgEl.textContent = t("myStorePayError");
-          editMsgEl.className = "status-msg show err";
-        });
-    });
-
-    card.querySelector('[data-action="deleteListing"]').addEventListener("click", () => {
-      if (!confirm(t("myStoreDeleteConfirm"))) return;
-      fetch(`/api/restaurants/mine/${r.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${state.accessToken}` },
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("failed");
-          return res.json();
-        })
-        .then(() => {
-          editMsgEl.textContent = t("myStoreDeleteSuccess");
-          editMsgEl.className = "status-msg show ok";
-          loadMine();
-        })
-        .catch(() => {
-          editMsgEl.textContent = t("myStoreDeleteError");
-          editMsgEl.className = "status-msg show err";
-        });
-    });
-
-    const msgEl = card.querySelector('[data-role="msg"]');
-    function showMsg(text, ok) {
-      msgEl.textContent = text;
-      msgEl.className = "status-msg show " + (ok ? "ok" : "err");
-    }
-
-    const renewBtn = card.querySelector('[data-action="renew"]');
-    if (renewBtn) {
-      renewBtn.addEventListener("click", () => {
-        payFor(r.id, "renewal", RENEWAL_FEE_PI, `飲食.Pi renewal: ${r.name}`, showMsg);
-      });
-    }
-    card.querySelector('[data-action="sponsor"]').addEventListener("click", () => {
-      payFor(r.id, "sponsor", SPONSOR_FEE_PI, `飲食.Pi sponsor: ${r.name}`, showMsg);
-    });
-
-    return card;
-  }
-
-  function payFor(restaurantId, paymentType, amount, memo, showMsg) {
-    Pi.createPayment(
-      { amount, memo, metadata: { type: paymentType, restaurantId } },
-      {
-        onReadyForServerApproval: (paymentId) => {
-          fetch("/api/payments/approve", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ paymentId }),
-          });
-        },
-        onReadyForServerCompletion: (paymentId, txid) => {
-          fetch("/api/payments/complete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ paymentId, txid, paymentType, restaurantId }),
-          })
-            .then((r) => r.json())
-            .then(() => {
-              showMsg(t("myStorePaySuccess"), true);
-              loadMine();
-            })
-            .catch(() => showMsg(t("myStorePayError"), false));
-        },
-        onCancel: () => {},
-        onError: () => showMsg(t("myStorePayError"), false),
-      }
-    );
-  }
-
-  function escapeHtml(str) {
-    return String(str).replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-  }
-})();
+      if
