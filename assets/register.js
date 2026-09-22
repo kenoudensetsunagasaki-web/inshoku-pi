@@ -11,7 +11,7 @@
     langToggle.textContent = getLocale() === "ja" ? "EN" : "日本語";
   });
 
-        const LISTING_FEE_PI = 1; // per 6 months (180 days) — see onReadyForServerCompletion below
+    const LISTING_FEE_PI = 1; // per month — see onReadyForServerCompletion below
   let piUser = null;
   let piAccessToken = null;
   let coords = null;
@@ -75,10 +75,42 @@
     }).catch(() => {});
   }
 
-   // ---- coordinates ----
+  // ---- interactive map for picking the exact location ----
+  // Leaflet + OpenStreetMap tiles — free, no API key needed. Tapping the
+  // map or dragging the pin is the primary way to set coordinates now;
+  // address-lookup and GPS below are just shortcuts that move the same pin.
+  const map = L.map("locationMap").setView([36.2048, 138.2529], 5); // Japan-wide default view
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 19,
+  }).addTo(map);
+  let marker = null;
+
+  function setMarker(lat, lng, pan) {
+    coords = { lat, lng };
+    document.getElementById("lat").value = lat;
+    document.getElementById("lng").value = lng;
+    document.getElementById("coordsPreview").textContent =
+      `${t("coordsCaptured")}: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if (marker) {
+      marker.setLatLng([lat, lng]);
+    } else {
+      marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on("dragend", () => {
+        const pos = marker.getLatLng();
+        setMarker(pos.lat, pos.lng, false);
+      });
+    }
+    if (pan) map.setView([lat, lng], 16);
+  }
+
+  map.on("click", (e) => {
+    setMarker(e.latlng.lat, e.latlng.lng, false);
+  });
+
   // Option 1: geocode the typed address (via OpenStreetMap's free Nominatim
-  // API — no API key needed) so an owner can register without having to
-  // physically stand at the store.
+  // API) — moves the pin there automatically so the owner can just confirm
+  // or nudge it, instead of typing anything.
   document.getElementById("geocodeBtn").addEventListener("click", async () => {
     const address = document.getElementById("address").value.trim();
     if (!address) {
@@ -98,11 +130,7 @@
         alert(t("geocodeError"));
         return;
       }
-      coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-      document.getElementById("lat").value = coords.lat;
-      document.getElementById("lng").value = coords.lng;
-      document.getElementById("coordsPreview").textContent =
-        `${t("coordsCaptured")}: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+      setMarker(parseFloat(data[0].lat), parseFloat(data[0].lon), true);
     } catch (err) {
       alert(t("geocodeError"));
     } finally {
@@ -111,23 +139,16 @@
     }
   });
 
-  // Option 2: use the device's actual GPS location (more accurate when
-  // physically on-site, but requires being there).
+  // Option 2: use the device's actual GPS location (moves the pin there too).
   document.getElementById("useLocationBtn").addEventListener("click", () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        document.getElementById("lat").value = coords.lat;
-        document.getElementById("lng").value = coords.lng;
-        document.getElementById("coordsPreview").textContent =
-          `${t("coordsCaptured")}: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
-      },
+      (pos) => setMarker(pos.coords.latitude, pos.coords.longitude, true),
       (err) => alert("Could not get location: " + err.message)
     );
   });
 
-    // ---- submit: create payment, then register on completion ----
+  // ---- submit: create payment, then register on completion ----
   document.getElementById("regForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!piUser) {
@@ -140,140 +161,8 @@
       return;
     }
 
-    // Coordinates are required internally (the search page finds places by
-    // distance), but most people should never have to think about this: if
-    // nothing has captured lat/lng yet, look them up from the typed address
-    // automatically, right now, before going any further.
-    let latVal = parseFloat(document.getElementById("lat").value);
-    let lngVal = parseFloat(document.getElementById("lng").value);
-    if (Number.isNaN(latVal) || Number.isNaN(lngVal)) {
+    // If no pin has been placed on the map yet, try geocoding the typed
+    // address automatically before asking the owner to do anything extra.
+    if (!coords) {
       const address = document.getElementById("address").value.trim();
       if (!address) {
-        showStatus(t("required"), false);
-        return;
-      }
-      showStatus(t("geocodingOnSubmit"), true);
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`
-        );
-        const data = await res.json();
-        if (data.length) {
-          latVal = parseFloat(data[0].lat);
-          lngVal = parseFloat(data[0].lon);
-          document.getElementById("lat").value = latVal;
-          document.getElementById("lng").value = lngVal;
-          document.getElementById("coordsPreview").textContent =
-            `${t("coordsCaptured")}: ${latVal.toFixed(5)}, ${lngVal.toFixed(5)}`;
-        }
-      } catch (err) {
-        // handled by the NaN check below
-      }
-    }
-    if (Number.isNaN(latVal) || Number.isNaN(lngVal)) {
-      showStatus(t("coordsRequired"), false);
-      return;
-    }
-
-    const restaurant = {
-      name: document.getElementById("name").value.trim(),
-      name_en: document.getElementById("nameEn").value.trim(),
-      address: document.getElementById("address").value.trim(),
-      cuisine: document.getElementById("cuisine").value.trim(),
-      phone: document.getElementById("phone").value.trim(),
-      website: document.getElementById("website").value.trim(),
-      hours: document.getElementById("hours").value.trim(),
-      menu_highlights: document
-        .getElementById("menuHighlights")
-        .value.split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean),
-      lat: latVal,
-      lng: lngVal,
-      accepted_currencies: selectedCurrencies,
-      source: "self_registered",
-      submitted_by: piUser.username,
-    };
-
-       payBtn.disabled = true;
-    payBtn.textContent = t("processingPayment");
-
-    // ---- Testnet period: skip Pi payment entirely, register for free ----
-    if (freeRegistration) {
-      fetch("/api/restaurants/free-register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${piAccessToken}`,
-        },
-        body: JSON.stringify(restaurant),
-      })
-        .then((r) => {
-          if (!r.ok) throw new Error("failed");
-          return r.json();
-        })
-        .then(() => {
-          showStatus(t("regSuccess"), true);
-          payBtn.disabled = false;
-          payBtn.textContent = t("payAndListFree");
-          document.getElementById("regForm").reset();
-        })
-        .catch(() => {
-          showStatus(t("regError"), false);
-          payBtn.disabled = false;
-          payBtn.textContent = t("payAndListFree");
-        });
-      return;
-    }
-
-    try {
-      await Pi.createPayment(
-        {
-          amount: LISTING_FEE_PI,
-                   memo: `飲食.Pi listing (6 months): ${restaurant.name}`,
-          metadata: { type: "new_listing", restaurant },
-        },
-        {
-          onReadyForServerApproval: (paymentId) => {
-            fetch("/api/payments/approve", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ paymentId }),
-            });
-          },
-          onReadyForServerCompletion: (paymentId, txid) => {
-            fetch("/api/payments/complete", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ paymentId, txid, paymentType: "new_listing", restaurant }),
-            })
-              .then((r) => r.json())
-              .then(() => {
-                showStatus(t("regSuccess"), true);
-                payBtn.textContent = t("payAndList");
-                document.getElementById("regForm").reset();
-              })
-              .catch(() => {
-                showStatus(t("regError"), false);
-                payBtn.disabled = false;
-                payBtn.textContent = t("payAndList");
-              });
-          },
-          onCancel: () => {
-            payBtn.disabled = false;
-            payBtn.textContent = t("payAndList");
-          },
-          onError: () => {
-            showStatus(t("regError"), false);
-            payBtn.disabled = false;
-            payBtn.textContent = t("payAndList");
-          },
-        }
-      );
-    } catch (err) {
-      showStatus(t("regError"), false);
-      payBtn.disabled = false;
-      payBtn.textContent = t("payAndList");
-    }
-  });
-})();
