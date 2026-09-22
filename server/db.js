@@ -287,7 +287,19 @@ async function allReviews() {
   return out.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
-const OWNER_EDITABLE_FIELDS = ["hours", "menu_highlights", "phone", "website", "cuisine"];
+const OWNER_EDITABLE_FIELDS = [
+  "name",
+  "name_en",
+  "address",
+  "cuisine",
+  "phone",
+  "website",
+  "hours",
+  "menu_highlights",
+  "accepted_currencies",
+  "lat",
+  "lng",
+];
 async function updateOwnListing(id, username, patch) {
   const col = requireCollection();
   const doc = await col.findOne({ id });
@@ -295,10 +307,31 @@ async function updateOwnListing(id, username, patch) {
   if (doc.submitted_by !== username) return "forbidden";
   const safePatch = {};
   OWNER_EDITABLE_FIELDS.forEach((field) => {
-    if (patch[field] !== undefined) safePatch[field] = patch[field];
+    if (patch[field] === undefined) return;
+    if (field === "lat" || field === "lng") {
+      const num = Number(patch[field]);
+      if (!Number.isNaN(num)) safePatch[field] = num;
+    } else if (field === "accepted_currencies") {
+      safePatch[field] = Array.isArray(patch[field]) ? patch[field] : [];
+    } else {
+      safePatch[field] = patch[field];
+    }
   });
   await col.updateOne({ id }, { $set: { ...safePatch, updated_at: new Date().toISOString() } });
   return col.findOne({ id });
+}
+
+// Lets a store owner withdraw their own listing entirely (e.g. the business
+// closed, or they registered by mistake). Unlike admin rejection, this is a
+// real delete — the owner asked for their data to be removed, not just
+// hidden. Same ownership check as updateOwnListing.
+async function deleteOwnListing(id, username) {
+  const col = requireCollection();
+  const doc = await col.findOne({ id });
+  if (!doc) return null;
+  if (doc.submitted_by !== username) return "forbidden";
+  await col.deleteOne({ id });
+  return true;
 }
 
 module.exports = {
@@ -319,6 +352,7 @@ module.exports = {
   hideReview,
   allReviews,
   updateOwnListing,
+  deleteOwnListing,
   dueForExpiryReminder,
   markReminderSent,
 };
