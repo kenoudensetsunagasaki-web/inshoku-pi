@@ -127,20 +127,51 @@
     );
   });
 
-  // ---- submit: create payment, then register on completion ----
+    // ---- submit: create payment, then register on completion ----
   document.getElementById("regForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!piUser) {
       showStatus(t("piRequired"), false);
       return;
     }
-    if (!coords) {
-      showStatus(t("useMyLocation"), false);
-      return;
-    }
     const selectedCurrencies = [...grid.querySelectorAll("input:checked")].map((i) => i.value);
     if (selectedCurrencies.length === 0) {
       showStatus(t("selectAtLeastOne"), false);
+      return;
+    }
+
+    // Coordinates are required internally (the search page finds places by
+    // distance), but most people should never have to think about this: if
+    // nothing has captured lat/lng yet, look them up from the typed address
+    // automatically, right now, before going any further.
+    let latVal = parseFloat(document.getElementById("lat").value);
+    let lngVal = parseFloat(document.getElementById("lng").value);
+    if (Number.isNaN(latVal) || Number.isNaN(lngVal)) {
+      const address = document.getElementById("address").value.trim();
+      if (!address) {
+        showStatus(t("required"), false);
+        return;
+      }
+      showStatus(t("geocodingOnSubmit"), true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`
+        );
+        const data = await res.json();
+        if (data.length) {
+          latVal = parseFloat(data[0].lat);
+          lngVal = parseFloat(data[0].lon);
+          document.getElementById("lat").value = latVal;
+          document.getElementById("lng").value = lngVal;
+          document.getElementById("coordsPreview").textContent =
+            `${t("coordsCaptured")}: ${latVal.toFixed(5)}, ${lngVal.toFixed(5)}`;
+        }
+      } catch (err) {
+        // handled by the NaN check below
+      }
+    }
+    if (Number.isNaN(latVal) || Number.isNaN(lngVal)) {
+      showStatus(t("coordsRequired"), false);
       return;
     }
 
@@ -150,16 +181,15 @@
       address: document.getElementById("address").value.trim(),
       cuisine: document.getElementById("cuisine").value.trim(),
       phone: document.getElementById("phone").value.trim(),
-           website: document.getElementById("website").value.trim(),
-      email: document.getElementById("email").value.trim(),
+      website: document.getElementById("website").value.trim(),
       hours: document.getElementById("hours").value.trim(),
       menu_highlights: document
         .getElementById("menuHighlights")
         .value.split("\n")
         .map((line) => line.trim())
         .filter(Boolean),
-      lat: coords.lat,
-      lng: coords.lng,
+      lat: latVal,
+      lng: lngVal,
       accepted_currencies: selectedCurrencies,
       source: "self_registered",
       submitted_by: piUser.username,
