@@ -1,168 +1,102 @@
-// 飲食.Pi — store self-registration + Pi payment
-(function () {
-  "use strict";
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>店舗登録 — PiFood & PiDrinks</title>
+<link rel="stylesheet" href="/assets/style.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/currencies.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+       <div class="wordmark">PiFood &amp; PiDrinks</div>
+    <button class="pill-btn" id="langToggle" type="button">EN</button>
+  </header>
 
-  applyI18n();
-  const langToggle = document.getElementById("langToggle");
-  langToggle.textContent = getLocale() === "ja" ? "EN" : "日本語";
-  langToggle.addEventListener("click", () => {
-    setLocale(getLocale() === "ja" ? "en" : "ja");
-    applyI18n();
-    langToggle.textContent = getLocale() === "ja" ? "EN" : "日本語";
-  });
+  <div class="form-page">
+    <h1 data-i18n="regTitle">店舗を登録する</h1>
+    <p class="subtitle" data-i18n="regSubtitle"></p>
 
-    const LISTING_FEE_PI = 1; // per month — see onReadyForServerCompletion below
-  let piUser = null;
-  let piAccessToken = null;
-  let coords = null;
-  let freeRegistration = false; // set from /api/config below — server-controlled, never client-decided
+    <div class="notice-box">
+      <strong data-i18n="listingFee">掲載料</strong>: <span id="feeLabel">1 π / 月</span> —
+      <span id="piAuthStatus" data-i18n="piRequired">Pi Browserでサインインしてから登録してください。</span>
+      <br />
+           <span style="font-size:12px;">毎月自動で引き落とされるわけではありません。期限が近づいたら「<a href="/mystore.html" style="color:var(--accent-mint);">マイ店舗</a>」ページから更新してください(更新を忘れると掲載は非表示になります)。</span>
+    </div>
+    <div class="status-msg" id="freeRegistrationBanner"></div>
 
-  // ---- Testnet-period free registration banner ----
-  // Checked against the server on every load; the server is the only thing
-  // that can actually turn this on (see FREE_REGISTRATION_TESTNET in
-  // .env.example), so there's nothing to spoof by editing this file.
-  fetch("/api/config")
-    .then((r) => r.json())
-    .then((cfg) => {
-      freeRegistration = !!cfg.freeRegistration;
-      const banner = document.getElementById("freeRegistrationBanner");
-      if (freeRegistration && banner) {
-        banner.textContent = t("freeRegistrationBanner");
-        banner.classList.add("show");
-      }
-      if (freeRegistration) payBtn.textContent = t("payAndListFree");
-    })
-    .catch(() => {});
+    <form id="regForm">
+      <div class="field">
+        <label data-i18n="storeName">店舗名</label>
+        <input type="text" id="name" required />
+      </div>
+      <div class="field">
+        <label data-i18n="storeNameEn">店舗名(英語表記・任意)</label>
+        <input type="text" id="nameEn" />
+      </div>
+      <div class="field">
+        <label data-i18n="address">住所</label>
+        <input type="text" id="address" required />
+      </div>
+      <div class="field">
+        <label data-i18n="cuisine">料理ジャンル</label>
+        <input type="text" id="cuisine" placeholder="例: 和食 / Ramen / Tacos" />
+      </div>
+      <div class="field">
+        <label data-i18n="phone">電話番号(任意)</label>
+        <input type="tel" id="phone" />
+      </div>
+      <div class="field">
+        <label data-i18n="website">ウェブサイト(任意)</label>
+        <input type="url" id="website" placeholder="https://" />
+      </div>
+      <div class="field">
+        <label data-i18n="hours">営業時間</label>
+        <input type="text" id="hours" data-i18n-placeholder="hoursPlaceholder" />
+      </div>
+      <div class="field">
+        <label data-i18n="menuHighlights">おすすめメニュー(任意)</label>
+        <textarea id="menuHighlights" data-i18n-placeholder="menuHighlightsPlaceholder"></textarea>
+      </div>
 
-  // currency checkboxes
-  const grid = document.getElementById("currencyGrid");
-  CURRENCIES.forEach((c) => {
-    const label = document.createElement("label");
-    label.innerHTML = `<input type="checkbox" value="${c.code}" /> ${c.symbol} ${c.label}`;
-    grid.appendChild(label);
-  });
+      <div class="field">
+        <label data-i18n="currencies">受け付ける決済</label>
+        <div class="checkbox-grid" id="currencyGrid"></div>
+      </div>
 
-  const payBtn = document.getElementById("payBtn");
-  const statusEl = document.getElementById("statusMsg");
-  const authStatusEl = document.getElementById("piAuthStatus");
+      <div class="field">
+        <label data-i18n="coordinates">緯度・経度</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="action-btn" id="geocodeBtn" data-i18n="geocodeFromAddress">住所から座標を取得</button>
+          <button type="button" class="action-btn" id="useLocationBtn" data-i18n="useMyLocation">現在地の座標を使う</button>
+        </div>
+        <div id="locationMap" style="height:280px;border-radius:8px;margin-top:8px;"></div>
+        <div class="stall-meta" id="coordsPreview" style="margin-top:8px;"></div>
+        <div class="stall-meta" style="margin-top:4px;font-size:12px;" data-i18n="mapTapHint"></div>
+        <input type="hidden" id="lat" />
+        <input type="hidden" id="lng" />
+      </div>
 
-  function showStatus(msg, ok) {
-    statusEl.textContent = msg;
-    statusEl.className = "status-msg show " + (ok ? "ok" : "err");
-  }
+      <button type="submit" class="submit-btn" id="payBtn" data-i18n="payAndList" disabled>支払って掲載する</button>
+      <div class="status-msg" id="statusMsg"></div>
+    </form>
+  </div>
 
-  // ---- Pi auth (required before payment) ----
-  (async function initPi() {
-    try {
-      await Pi.init({ version: "2.0", sandbox: false });
-           const auth = await Pi.authenticate(["username", "payments"], onIncompletePaymentFound);
-      piUser = auth.user;
-      piAccessToken = auth.accessToken;
-      authStatusEl.textContent = `${t("piSignedIn")}: ${piUser.username}`;
-      payBtn.disabled = false;
-    } catch (e) {
-      console.warn("Pi auth unavailable:", e);
-      authStatusEl.textContent = t("piRequired");
-      payBtn.disabled = true;
-    }
-  })();
+  <nav class="bottom-nav">
+    <a href="/index.html" data-i18n="navSearch">探す</a>
+    <a href="/submit.html" data-i18n="navSubmit">情報提供</a>
+    <a href="/register.html" class="active" data-i18n="navRegister">店舗登録</a>
+    <a href="/mystore.html" data-i18n="navMyStore">マイ店舗</a>
+  </nav>
+  <div class="legal-links"><a href="/privacy.html">プライバシーポリシー / Privacy</a> · <a href="/terms.html">利用規約 / Terms</a></div>
+</div>
 
-  function onIncompletePaymentFound(payment) {
-    fetch("/api/payments/incomplete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ payment }),
-    }).catch(() => {});
-  }
-
-  // ---- interactive map for picking the exact location ----
-  // Leaflet + OpenStreetMap tiles — free, no API key needed. Tapping the
-  // map or dragging the pin is the primary way to set coordinates now;
-  // address-lookup and GPS below are just shortcuts that move the same pin.
-  const map = L.map("locationMap").setView([36.2048, 138.2529], 5); // Japan-wide default view
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors",
-    maxZoom: 19,
-  }).addTo(map);
-  let marker = null;
-
-  function setMarker(lat, lng, pan) {
-    coords = { lat, lng };
-    document.getElementById("lat").value = lat;
-    document.getElementById("lng").value = lng;
-    document.getElementById("coordsPreview").textContent =
-      `${t("coordsCaptured")}: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    if (marker) {
-      marker.setLatLng([lat, lng]);
-    } else {
-      marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-      marker.on("dragend", () => {
-        const pos = marker.getLatLng();
-        setMarker(pos.lat, pos.lng, false);
-      });
-    }
-    if (pan) map.setView([lat, lng], 16);
-  }
-
-  map.on("click", (e) => {
-    setMarker(e.latlng.lat, e.latlng.lng, false);
-  });
-
-  // Option 1: geocode the typed address (via OpenStreetMap's free Nominatim
-  // API) — moves the pin there automatically so the owner can just confirm
-  // or nudge it, instead of typing anything.
-  document.getElementById("geocodeBtn").addEventListener("click", async () => {
-    const address = document.getElementById("address").value.trim();
-    if (!address) {
-      alert(t("required"));
-      return;
-    }
-    const btn = document.getElementById("geocodeBtn");
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = t("geocoding");
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`
-      );
-      const data = await res.json();
-      if (!data.length) {
-        alert(t("geocodeError"));
-        return;
-      }
-      setMarker(parseFloat(data[0].lat), parseFloat(data[0].lon), true);
-    } catch (err) {
-      alert(t("geocodeError"));
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalText;
-    }
-  });
-
-  // Option 2: use the device's actual GPS location (moves the pin there too).
-  document.getElementById("useLocationBtn").addEventListener("click", () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setMarker(pos.coords.latitude, pos.coords.longitude, true),
-      (err) => alert("Could not get location: " + err.message)
-    );
-  });
-
-  // ---- submit: create payment, then register on completion ----
-  document.getElementById("regForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (!piUser) {
-      showStatus(t("piRequired"), false);
-      return;
-    }
-    const selectedCurrencies = [...grid.querySelectorAll("input:checked")].map((i) => i.value);
-    if (selectedCurrencies.length === 0) {
-      showStatus(t("selectAtLeastOne"), false);
-      return;
-    }
-
-    // If no pin has been placed on the map yet, try geocoding the typed
-    // address automatically before asking the owner to do anything extra.
-    if (!coords) {
-      const address = document.getElementById("address").value.trim();
-      if (!address) {
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/assets/register.js"></script>
+<script src="/assets/sw-register.js"></script>
+</body>
+</html>
