@@ -152,6 +152,28 @@ router.patch("/mine/:id", async (req, res) => {
   }
 });
 
+// DELETE /api/restaurants/mine/:id — store owner withdraws their own
+// listing entirely. Same Pi-session verification as the other /mine
+// endpoints, so only the actual owner can remove it.
+router.delete("/mine/:id", async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "missing Pi access token" });
+  try {
+    const meRes = await fetch(`${PI_API_BASE}/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!meRes.ok) return res.status(401).json({ error: "invalid Pi session" });
+    const me = await meRes.json();
+    const result = await db.deleteOwnListing(req.params.id, me.username);
+    if (result === "forbidden") return res.status(403).json({ error: "not your listing" });
+    if (!result) return res.status(404).json({ error: "not found" });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("mine delete error:", err.message);
+    res.status(502).json({ error: "failed to verify Pi session" });
+  }
+});
 // POST /api/restaurants/:id/track  { event: "directions" | "gmaps" }
 // Fire-and-forget click tracking for the store-owner dashboard. No auth —
 // it's just an anonymous counter, same trust level as a page-view count.
