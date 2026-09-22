@@ -71,15 +71,18 @@
         <div class="checkbox-grid" id="currencyGrid"></div>
       </div>
 
-           <div class="field">
+                <div class="field">
         <label data-i18n="address">緯度・経度</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button type="button" class="action-btn" id="geocodeBtn" data-i18n="geocodeFromAddress">住所から座標を取得</button>
           <button type="button" class="action-btn" id="useLocationBtn" data-i18n="useMyLocation">現在地の座標を使う</button>
         </div>
-        <input type="hidden" id="lat" />
-        <input type="hidden" id="lng" />
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input type="number" step="any" id="lat" placeholder="緯度 / Lat" style="flex:1;" />
+          <input type="number" step="any" id="lng" placeholder="経度 / Lng" style="flex:1;" />
+        </div>
         <div class="stall-meta" id="coordsPreview" style="margin-top:8px;"></div>
+        <div class="stall-meta" style="margin-top:4px;font-size:12px;" data-i18n="manualCoordsHint"></div>
       </div>
 
       <button type="submit" class="submit-btn" id="payBtn" data-i18n="payAndList" disabled>支払って掲載する</button>
