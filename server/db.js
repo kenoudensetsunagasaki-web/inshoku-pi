@@ -39,6 +39,14 @@ function requireCollection() {
   return collection;
 }
 
+// A trivial, cheap query used only to keep MongoDB Atlas's free tier (M0)
+// from auto-pausing after 30 days with no database activity. Uptime
+// monitors (e.g. UptimeRobot) hit /api/config every few minutes to keep
+// Render awake, but that alone never touches MongoDB — this does.
+async function ping() {
+  return requireCollection().estimatedDocumentCount();
+}
+
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -336,6 +344,7 @@ async function deleteOwnListing(id, username) {
 
 module.exports = {
   connect,
+  ping,
   all,
   getById,
   findByExternal,
