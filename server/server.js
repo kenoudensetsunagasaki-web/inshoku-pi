@@ -26,11 +26,16 @@ app.use(express.json());
 // in .env.example: flip it off once the Pi Developer Portal review passes and
 // the app is live on Mainnet, so real Pi payments are required again.
 app.get("/api/config", (req, res) => {
+  // Touch MongoDB on every call so the uptime monitor's regular ping to
+  // this endpoint also counts as database activity — otherwise Atlas's
+  // free tier (M0) can auto-pause after 30 days with no real usage, even
+  // though Render itself stays awake. Fire-and-forget: never let a Mongo
+  // hiccup slow down or break this health-check response.
+  db.ping().catch((err) => console.warn("[ping] MongoDB keep-alive failed:", err.message));
   res.json({
     freeRegistration: process.env.FREE_REGISTRATION_TESTNET === "true",
   });
 });
-
 // API routes
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/payments", paymentRoutes);
