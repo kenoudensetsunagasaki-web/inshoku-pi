@@ -56,6 +56,32 @@ router.post("/restaurants/:id/reject", requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/admin/restaurants/all — every listing regardless of status, for
+// the admin panel's "掲載中の店舗一覧" section (lets the operator find and
+// remove something that's already live, not just review the pending queue).
+router.get("/restaurants/all", requireAdmin, async (req, res) => {
+  try {
+    res.json({ results: await db.all() });
+  } catch (err) {
+    console.error("all listings error:", err.message);
+    res.status(502).json({ error: "failed to load listings" });
+  }
+});
+
+// DELETE /api/admin/restaurants/:id — hard delete, any status. Unlike the
+// owner-facing DELETE /api/restaurants/mine/:id, this has no ownership
+// check — it's gated by the admin token instead.
+router.delete("/restaurants/:id", requireAdmin, async (req, res) => {
+  try {
+    const ok = await db.adminDeleteListing(req.params.id);
+    if (!ok) return res.status(404).json({ error: "not found" });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("admin delete error:", err.message);
+    res.status(502).json({ error: "delete failed" });
+  }
+});
+
 // Manual entry by the operator — goes live immediately as admin-verified.
 router.post("/restaurants", requireAdmin, async (req, res) => {
   const body = req.body || {};
