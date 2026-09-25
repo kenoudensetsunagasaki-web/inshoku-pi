@@ -381,7 +381,10 @@
     fetch(`/api/restaurants/${r.id}`)
       .then((res) => res.json())
       .then((full) => {
-      const hoursHtml = `<div class="detail-row"><strong>${t("hours")}</strong>${full.hours ? escapeHtml(full.hours) : `<span style="color:var(--text-faint);">${t("noHours")}</span>`}</div>`;
+           const hoursHtml = `<div class="detail-row"><strong>${t("hours")}</strong>${full.hours ? escapeHtml(full.hours) : `<span style="color:var(--text-faint);">${t("noHours")}</span>`}</div>`;
+        const websiteHtml = full.website
+          ? `<div class="detail-row"><a href="${escapeHtml(full.website)}" target="_blank" rel="noopener" style="color:var(--accent-mint);">${t("visitWebsite")} ↗</a></div>`
+          : "";
         const menuItems = full.menu_highlights || [];
         const menuHtml = `<div class="detail-row"><strong>${t("menuHighlightsShort")}</strong>${
           menuItems.length
@@ -402,8 +405,9 @@
               .join("")}</div>`
           : `<div class="detail-row" style="color:var(--text-faint);">${t("noReviews")}</div>`;
 
-        detailEl.innerHTML = `
+               detailEl.innerHTML = `
           ${hoursHtml}
+          ${websiteHtml}
           ${menuHtml}
           <div class="detail-row"><strong>${t("reviews")} (${full.rating_count || 0})</strong></div>
           ${reviewListHtml}
