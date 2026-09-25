@@ -88,8 +88,9 @@ const DICT = {
     myStoreDeleteSuccess: "登録を取り消しました。",
     myStoreDeleteError: "取り消しに失敗しました。時間をおいて再度お試しください。",
     // richer venue info
-    hours: "営業時間",
+       hours: "営業時間",
     hoursPlaceholder: "例: 月-金 11:00-22:00 / 土日祝 定休",
+    visitWebsite: "ウェブサイトを見る",
     menuHighlights: "おすすめメニュー(任意)",
     menuHighlightsShort: "おすすめメニュー",
     menuHighlightsPlaceholder: "1行に1品ずつ。例:\n味噌ラーメン - 900円\nチャーシュー丼 - 700円",
@@ -204,8 +205,9 @@ const DICT = {
     myStoreDeleteSuccess: "Listing deleted.",
     myStoreDeleteError: "Failed to delete. Please try again later.",
     // richer venue info
-    hours: "Opening hours",
+      hours: "Opening hours",
     hoursPlaceholder: "e.g. Mon-Fri 11:00-22:00 / Closed weekends",
+    visitWebsite: "Visit website",
     menuHighlights: "Menu highlights (optional)",
     menuHighlightsShort: "Menu highlights",
     menuHighlightsPlaceholder: "One item per line, e.g.:\nMiso ramen - $8\nChashu rice bowl - $6",
