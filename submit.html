@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>情報提供 — PiFood & PiDrinks</title>
 <link rel="stylesheet" href="/assets/style.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="/assets/i18n.js"></script>
 <script src="/assets/currencies.js"></script>
 </head>
@@ -43,12 +44,17 @@
         <div class="checkbox-grid" id="currencyGrid"></div>
       </div>
 
-      <div class="field">
-        <label data-i18n="address">緯度・経度(任意)</label>
-        <button type="button" class="action-btn" id="useLocationBtn" data-i18n="useMyLocation">現在地の座標を使う</button>
+            <div class="field">
+        <label data-i18n="coordinates">緯度・経度</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="action-btn" id="geocodeBtn" data-i18n="geocodeFromAddress">住所から座標を取得</button>
+          <button type="button" class="action-btn" id="useLocationBtn" data-i18n="useMyLocation">現在地の座標を使う</button>
+        </div>
+        <div id="locationMap" style="height:280px;border-radius:8px;margin-top:8px;"></div>
+        <div class="stall-meta" id="coordsPreview" style="margin-top:8px;"></div>
+        <div class="stall-meta" style="margin-top:4px;font-size:12px;" data-i18n="mapTapHint"></div>
         <input type="hidden" id="lat" />
         <input type="hidden" id="lng" />
-        <div class="stall-meta" id="coordsPreview" style="margin-top:8px;"></div>
       </div>
 
       <div class="field">
@@ -74,6 +80,7 @@
     <div class="legal-links"><a href="/privacy.html">プライバシーポリシー / Privacy</a> · <a href="/terms.html">利用規約 / Terms</a></div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/assets/submit.js"></script>
 <script src="/assets/sw-register.js"></script>
 </body>
