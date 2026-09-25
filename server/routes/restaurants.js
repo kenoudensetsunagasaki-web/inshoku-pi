@@ -208,11 +208,11 @@ router.post("/submit", async (req, res) => {
     return res.status(400).json({ error: "at least one currency is required" });
   }
   try {
-    const record = await db.insert({
+       const record = await db.insert({
       name: body.name,
       address: body.address,
-      lat: body.lat ?? 0,
-      lng: body.lng ?? 0,
+      lat: body.lat ?? null,
+      lng: body.lng ?? null,
       accepted_currencies: body.accepted_currencies,
       hours: body.hours || "",
       menu_highlights: Array.isArray(body.menu_highlights) ? body.menu_highlights : [],
