@@ -329,10 +329,9 @@ async function updateOwnListing(id, username, patch) {
   return col.findOne({ id });
 }
 
-// Lets a store owner withdraw their own listing entirely (e.g. the business
-// closed, or they registered by mistake). Unlike admin rejection, this is a
-// real delete — the owner asked for their data to be removed, not just
-// hidden. Same ownership check as updateOwnListing.
+// Lets a store owner withdraw their own listing entirely. Unlike admin
+// rejection, this is a real delete — the owner asked for their data to be
+// removed, not just hidden. Same ownership check as updateOwnListing.
 async function deleteOwnListing(id, username) {
   const col = requireCollection();
   const doc = await col.findOne({ id });
@@ -342,6 +341,14 @@ async function deleteOwnListing(id, username) {
   return true;
 }
 
+// Admin-only hard delete — no ownership check, unlike deleteOwnListing.
+// Used to remove a listing that was approved with bad/incomplete data
+// (e.g. a submitted tip with no coordinates that slipped through review).
+async function adminDeleteListing(id) {
+  const col = requireCollection();
+  const res = await col.deleteOne({ id });
+  return res.deletedCount > 0;
+}
 module.exports = {
   connect,
   ping,
@@ -360,8 +367,9 @@ module.exports = {
   addReview,
   hideReview,
   allReviews,
-  updateOwnListing,
+   updateOwnListing,
   deleteOwnListing,
+  adminDeleteListing,
   dueForExpiryReminder,
   markReminderSent,
 };
