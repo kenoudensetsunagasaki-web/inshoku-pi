@@ -13,10 +13,11 @@
     statusEl.className = "status-msg show " + (ok ? "ok" : "err");
   }
 
-  function showPanel() {
+   function showPanel() {
     loginBox.style.display = "none";
     panel.style.display = "block";
     loadPending();
+    loadAll();
     loadReviews();
   }
 
@@ -99,7 +100,7 @@
     });
   }
 
-  document.getElementById("pendingList").addEventListener("click", (e) => {
+   document.getElementById("pendingList").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-do]");
     if (!btn) return;
     const id = btn.dataset.id;
@@ -108,6 +109,52 @@
       method: "POST",
       headers: { "x-admin-token": token },
     }).then(loadPending);
+  });
+
+  // ---- all listings (published + rejected), with a delete option ----
+  const STATUS_LABEL = { verified: "掲載中", pending: "審査待ち", rejected: "却下済み" };
+  function loadAll() {
+    fetch("/api/admin/restaurants/all", { headers: { "x-admin-token": token } })
+      .then((r) => r.json())
+      .then((data) => renderAll(data.results || []));
+  }
+
+  function renderAll(list) {
+    const el = document.getElementById("allListingsList");
+    if (list.length === 0) {
+      el.innerHTML = '<div class="empty-state">登録されている店舗がありません</div>';
+      return;
+    }
+    el.innerHTML = "";
+    list.forEach((r) => {
+      const card = document.createElement("div");
+      card.className = "stall-card";
+      card.dataset.tier = "community";
+      const lat = typeof r.lat === "number" ? r.lat.toFixed(5) : r.lat;
+      const lng = typeof r.lng === "number" ? r.lng.toFixed(5) : r.lng;
+      card.innerHTML = `
+        <div class="stall-name">${r.name}</div>
+        <div class="stall-meta">${r.address || ""}</div>
+        <div class="stall-meta">状態: ${STATUS_LABEL[r.status] || r.status} ・ 座標: ${lat}, ${lng}</div>
+        <div class="stall-actions">
+          <button class="action-btn" style="color:var(--accent-danger);border-color:var(--accent-danger);" data-id="${r.id}" data-name="${r.name}" data-do="delete">削除</button>
+        </div>
+      `;
+      el.appendChild(card);
+    });
+  }
+
+  document.getElementById("allListingsList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-do='delete']");
+    if (!btn) return;
+    if (!confirm(`「${btn.dataset.name}」を完全に削除します。よろしいですか？`)) return;
+    fetch(`/api/admin/restaurants/${btn.dataset.id}`, {
+      method: "DELETE",
+      headers: { "x-admin-token": token },
+    }).then(() => {
+      loadAll();
+      loadPending();
+    });
   });
 
   // manual add
