@@ -55,7 +55,11 @@ async function piFetch(path, { method = "GET", body } = {}) {
     headers: piHeaders(),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`Pi API ${method} ${path.split("?")[0]} failed: ${r.status}`);
+  if (!r.ok) {
+    // Pi's error text (never contains our key) makes failures diagnosable from the logs.
+    const detail = (await r.text().catch(() => "")).slice(0, 300);
+    throw new Error(`Pi API ${method} ${path.split("?")[0]} failed: ${r.status} ${detail}`);
+  }
   return r.json();
 }
 
