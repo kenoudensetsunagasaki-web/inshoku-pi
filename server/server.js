@@ -5,6 +5,7 @@ const path = require("path");
 const restaurantRoutes = require("./routes/restaurants");
 const paymentRoutes = require("./routes/payments");
 const adminRoutes = require("./routes/admin");
+const a2uRoutes = require("./routes/a2u");
 const db = require("./db");
 const { fetchCoinmapVenues } = require("./importers/coinmap");
 const { checkAndSendExpiryReminders } = require("./services/reminders");
@@ -40,6 +41,8 @@ app.get("/api/config", (req, res) => {
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
+// Test-only A2U payout (404 unless A2U_TEST_ENABLED=true). See routes/a2u.js.
+app.use("/api/a2u", a2uRoutes);
 
 // Static frontend (index.html, register.html, submit.html, admin.html, assets/)
 app.use(express.static(path.join(__dirname, "..")));
