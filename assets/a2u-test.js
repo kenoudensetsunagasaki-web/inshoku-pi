@@ -21,7 +21,7 @@
     btn.disabled = true;
     show("Pi にサインインしています…");
     try {
-      var auth = await Pi.authenticate(["username"], function () {});
+      var auth = await Pi.authenticate(["username", "wallet_address"], function () {});
       show("送金しています…(数十秒かかることがあります)");
       var res = await fetch("/api/a2u/test-payout", {
         method: "POST",
