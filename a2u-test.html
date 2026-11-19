@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>A2U送金テスト | PiFood &amp; PiDrinks</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 0; padding: 24px 16px; background: #faf7f2; color: #2b2b2b; }
+  main { max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  p { line-height: 1.7; font-size: 15px; }
+  button { width: 100%; padding: 14px; font-size: 16px; border: 0; border-radius: 10px; background: #6b3fa0; color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #result { margin-top: 16px; padding: 12px; border-radius: 10px; background: #fff; font-size: 14px; line-height: 1.6; min-height: 1.6em; word-break: break-all; }
+  .ok { color: #1b7a3a; }
+  .ng { color: #b3261e; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A2U送金テスト(Testnet)</h1>
+  <p>Pi Network の開発者審査のための動作確認ページです。ボタンを押すと、アプリのウォレットからあなたのTestnetウォレットへ <b>0.01 Test-π</b> が送られます(1人1回)。実際のπではありません。</p>
+  <button id="go" type="button">0.01 Test-π を受け取る</button>
+  <div id="result" role="status" aria-live="polite"></div>
+</main>
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<script src="assets/a2u-test.js"></script>
+</body>
+</html>
